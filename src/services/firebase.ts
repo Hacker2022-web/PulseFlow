@@ -13,6 +13,15 @@ export interface FirebaseConfigParams {
 
 const FB_CONFIG_STORAGE_KEY = 'pulseflow_custom_firebase_config';
 
+const DEFAULT_FIREBASE_CONFIG: FirebaseConfigParams = {
+  apiKey: "AIzaSyC7bYCieiVe4UxuxvWY8g8ktlJOcvOqKxk",
+  authDomain: "pulseflow-60adf.firebaseapp.com",
+  projectId: "pulseflow-60adf",
+  storageBucket: "pulseflow-60adf.firebasestorage.app",
+  messagingSenderId: "322963087969",
+  appId: "1:322963087969:web:93b2d007d6d2a52520c020"
+};
+
 export function getSavedFirebaseConfig(): FirebaseConfigParams | null {
   try {
     const raw = localStorage.getItem(FB_CONFIG_STORAGE_KEY) || localStorage.getItem('synctrack_custom_firebase_config');
@@ -33,7 +42,7 @@ export function getSavedFirebaseConfig(): FirebaseConfigParams | null {
     };
   }
 
-  return null;
+  return DEFAULT_FIREBASE_CONFIG;
 }
 
 export function saveCustomFirebaseConfig(config: FirebaseConfigParams | null): void {
