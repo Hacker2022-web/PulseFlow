@@ -102,12 +102,13 @@ class FirebaseService {
 
   // Real-time Cloud Sync to Firestore
   async syncUserData(userId: string, data: Record<string, any>): Promise<void> {
-    if (!this.db || !this.isConfigured) return;
+    if (!this.db || !this.isConfigured || !userId) return;
     try {
       const userDocRef = doc(this.db, 'users', userId);
       await setDoc(userDocRef, { ...data, updatedAt: new Date().toISOString() }, { merge: true });
-    } catch (err) {
-      console.warn('Firestore sync failed, local state preserved:', err);
+      console.log('✅ [PulseFlow Cloud] Successfully synced data to Cloud Firestore for user:', userId);
+    } catch (err: any) {
+      console.error('⚠️ [PulseFlow Cloud] Firestore write failed. Make sure your Firestore Rules tab allows read/write!', err);
     }
   }
 

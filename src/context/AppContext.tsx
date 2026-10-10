@@ -458,6 +458,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Trigger Sync Now
   const triggerSyncNow = useCallback(() => {
     setSyncStatus('syncing');
+    if (firebaseService.isConfigured && latestDataRef.current.user?.uid) {
+      const { habits, habitLogs, goals, dailyGoals, expenses, budgets, coopQuests, streakFreeze, subscriptions, bentoTiles, user } = latestDataRef.current;
+      firebaseService.syncUserData(user.uid, {
+        habits,
+        habitLogs,
+        goals,
+        dailyGoals,
+        expenses,
+        budgets,
+        coopQuests,
+        streakFreeze,
+        subscriptions,
+        bentoTiles,
+        user
+      });
+    }
     setTimeout(() => {
       setSyncStatus(navigator.onLine ? 'synced' : 'offline');
     }, 700);
