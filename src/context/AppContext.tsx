@@ -305,6 +305,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, [user?.uid]);
 
+  // Synchronize with Firebase Auth session state
+  useEffect(() => {
+    if (!firebaseService.auth) return;
+    const unsub = firebaseService.auth.onAuthStateChanged((fbUser) => {
+      if (fbUser) {
+        setUser(prev => ({
+          ...prev,
+          uid: fbUser.uid,
+          displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'My Account',
+          email: fbUser.email || prev.email,
+          photoURL: fbUser.photoURL || ''
+        }));
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // Auto-clean any stale demo data from previous test sessions
+  useEffect(() => {
+    if (collaboratorPair?.id === 'pair_demo_99' || collaboratorPair?.userBName === 'Alex Rivera') {
+      setCollaboratorPair(null);
+      LocalStorageService.removeItem(STORAGE_KEYS.PAIR);
+      LocalStorageService.removeItem(STORAGE_KEYS.PARTNER_ITEMS);
+    }
+    if (user.displayName === 'Alex Rivera' || user.displayName === 'Jordan Miller' || user.photoURL?.includes('unsplash')) {
+      setUser(prev => ({
+        ...prev,
+        displayName: prev.displayName === 'Alex Rivera' || prev.displayName === 'Jordan Miller' ? 'My Account' : prev.displayName,
+        photoURL: prev.photoURL?.includes('unsplash') ? '' : prev.photoURL
+      }));
+    }
+  }, []);
+
   useEffect(() => {
     LocalStorageService.setItem(STORAGE_KEYS.USER, user);
   }, [user]);

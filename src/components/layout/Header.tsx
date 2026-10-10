@@ -75,24 +75,36 @@ export const Header: React.FC<HeaderProps> = ({ onOpenQuickAdd }) => {
       </div>
 
       {/* Header Actions */}
-      <div className="flex items-center gap-2.5 sm:gap-4">
-        {/* Collaborator Quick Status Pill */}
-        {collaboratorPair?.status === 'active' ? (
+      <div className="flex items-center gap-2.5 sm:gap-3.5">
+        {/* User Account Capsule */}
+        <button
+          onClick={() => setActiveTab('settings')}
+          className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl liquid-glass-subtle hover:bg-white/[0.08] text-xs text-zinc-200 transition cursor-pointer"
+          title={`Signed in as ${user.displayName || user.email || 'My Account'}`}
+        >
+          {user.photoURL ? (
+            <img src={user.photoURL} alt={user.displayName} className="w-5 h-5 rounded-full object-cover border border-white/20" />
+          ) : (
+            <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-[10px] font-bold text-white shadow-inner">
+              {user.displayName ? user.displayName.slice(0, 2).toUpperCase() : 'ME'}
+            </div>
+          )}
+          <span className="font-semibold text-zinc-100 max-w-[110px] sm:max-w-[140px] truncate">
+            {user.displayName || (user.email ? user.email.split('@')[0] : 'My Account')}
+          </span>
+          <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" title="Online & Connected" />
+        </button>
+
+        {/* Collaborator Partner Indicator (Only if paired) */}
+        {collaboratorPair?.status === 'active' && collaboratorPair.userBName && (
           <button
             onClick={() => setActiveTab('collaborator')}
-            className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl liquid-glass-subtle text-xs hover:bg-white/[0.08] text-zinc-200 transition"
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-            <img src={collaboratorPair.userBAvatar} alt={collaboratorPair.userBName} className="w-5 h-5 rounded-md object-cover" />
-            <span className="font-semibold text-zinc-100">{collaboratorPair.userBName}</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => setActiveTab('collaborator')}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl liquid-glass-subtle text-xs text-zinc-300 hover:text-white transition"
+            className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl liquid-glass-subtle text-[11px] hover:bg-white/[0.08] text-zinc-300 transition"
+            title={`Duo Partner: ${collaboratorPair.userBName}`}
           >
             <Users2 className="w-3.5 h-3.5 text-indigo-300" />
-            <span>Pair Partner</span>
+            <span className="text-zinc-400">Partner:</span>
+            <span className="font-medium text-zinc-200">{collaboratorPair.userBName}</span>
           </button>
         )}
 

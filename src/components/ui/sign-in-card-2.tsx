@@ -157,12 +157,13 @@ export function Component({ embedded = false, className }: ComponentProps = {}) 
         const fbUser = await firebaseService.signInWithGoogle();
         if (fbUser) {
           updateUserProfile({
-            displayName: fbUser.displayName || 'Google User',
-            email: fbUser.email || 'user@gmail.com',
-            photoURL: fbUser.photoURL || undefined
+            uid: fbUser.uid,
+            displayName: fbUser.displayName || (fbUser.email ? fbUser.email.split('@')[0] : 'My Account'),
+            email: fbUser.email || '',
+            photoURL: fbUser.photoURL || ''
           });
-          setAuthSuccess(`Signed in with Google!`);
-          setTimeout(() => setActiveTab('dashboard'), 1000);
+          setAuthSuccess(`Signed in as ${fbUser.displayName || fbUser.email}!`);
+          setTimeout(() => setActiveTab('dashboard'), 800);
           return;
         }
       }
@@ -170,11 +171,12 @@ export function Component({ embedded = false, className }: ComponentProps = {}) 
       setTimeout(() => {
         setIsLoading(false);
         updateUserProfile({
-          displayName: 'PulseFlow Member',
-          email: 'member@pulseflow.app'
+          displayName: 'My Account',
+          email: 'member@pulseflow.app',
+          photoURL: ''
         });
         setAuthSuccess(`Signed in successfully!`);
-        setTimeout(() => setActiveTab('dashboard'), 1000);
+        setTimeout(() => setActiveTab('dashboard'), 800);
       }, 900);
     } catch (err: any) {
       setIsLoading(false);

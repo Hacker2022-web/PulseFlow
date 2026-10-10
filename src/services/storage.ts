@@ -59,9 +59,9 @@ export function getDateOffsetString(daysOffset: number): string {
 
 export const INITIAL_USER: UserProfile = {
   uid: 'user_pulse_' + Math.random().toString(36).substring(2, 9),
-  displayName: 'New Member',
+  displayName: 'My Account',
   email: '',
-  photoURL: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=250&q=80',
+  photoURL: '',
   timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
   currency: 'USD',
   createdAt: new Date().toISOString(),
@@ -423,6 +423,14 @@ export class LocalStorageService {
       localStorage.setItem(key, JSON.stringify(value));
     } catch (e) {
       console.error(`Error saving key ${key} to storage:`, e);
+    }
+  }
+
+  static removeItem(key: string): void {
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {
+      console.error(`Error removing key ${key} from storage:`, e);
     }
   }
 

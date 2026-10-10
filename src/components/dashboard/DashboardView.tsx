@@ -220,16 +220,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
               </span>
             </button>
 
-            {/* Partner Status Pill (Desktop / Tablet) */}
-            {collaboratorPair ? (
+            {/* Partner Status Pill (Desktop / Tablet, Only when paired) */}
+            {collaboratorPair && collaboratorPair.status === 'active' && collaboratorPair.id !== 'pair_demo_99' ? (
               <button
                 onClick={() => setActiveTab('collaborator')}
-                className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl liquid-glass-subtle text-xs hover:bg-white/[0.08] transition-all cursor-pointer"
-                title="View Collaborator"
+                className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-xl liquid-glass-subtle text-xs hover:bg-white/[0.08] transition-all cursor-pointer"
+                title={`Duo Partner: ${collaboratorPair.userBName}`}
               >
                 <div className="w-5 h-5 rounded-md bg-white/10 border border-white/15 flex items-center justify-center text-[10px] font-bold text-indigo-200">
                   {partnerInitials}
                 </div>
+                <span className="text-zinc-400 text-[10px]">Partner:</span>
                 <span className="font-medium text-zinc-200">{collaboratorPair.userBName}</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
               </button>
