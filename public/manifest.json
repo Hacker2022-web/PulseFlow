@@ -1,0 +1,19 @@
+{
+  "name": "PulseFlow — Ambient Bento OS for Habits, Goals, Cash Flow & Co-op Sync",
+  "short_name": "PulseFlow",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070913",
+  "theme_color": "#070913",
+  "orientation": "portrait-primary",
+  "description": "PulseFlow — Ambient rhythmic tracking for daily habits, streak health, cash flow, and duo co-op accountability.",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "finance", "lifestyle"]
+}
