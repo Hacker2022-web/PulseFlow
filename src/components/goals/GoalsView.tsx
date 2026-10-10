@@ -335,7 +335,7 @@ export const GoalsView: React.FC = () => {
                         {goal.currentValue} / {goal.targetValue} {goal.unit || ''} ({percent}%)
                       </span>
                     </div>
-                    <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden my-2 backdrop-blur-md p-0.5">
+                    <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden my-2 p-0.5">
                       <div
                         className="bg-gradient-to-r from-indigo-400 to-violet-400 h-full rounded-full shadow-[0_0_10px_rgba(129,140,248,0.7)] transition-all duration-500"
                         style={{ width: `${percent}%` }}

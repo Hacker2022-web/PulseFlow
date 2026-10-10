@@ -499,7 +499,7 @@ export const ExpensesView: React.FC = () => {
                   ) : null}
                 </div>
 
-                <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden my-2 backdrop-blur-md p-0.5">
+                <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden my-2 p-0.5">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
                       ratio >= 1.0

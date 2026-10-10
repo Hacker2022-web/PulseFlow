@@ -97,7 +97,7 @@ export const BentoCoopQuestsTile: React.FC = () => {
                 </div>
 
                 {/* Dual Color Segmented Bar */}
-                <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden flex p-0.5 backdrop-blur-md">
+                <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden flex p-0.5">
                   <div
                     className="h-full bg-gradient-to-r from-cyan-400 to-indigo-500 rounded-l-full shadow-[0_0_8px_rgba(56,189,248,0.7)] transition-all duration-500"
                     style={{ width: `${percentA}%` }}

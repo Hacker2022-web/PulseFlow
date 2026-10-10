@@ -58,19 +58,19 @@
 
 /* ─── Purple Glassmorphism Panels ─── */
 .glass-panel {
-  background: rgba(23, 13, 38, 0.72);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(23, 13, 38, 0.82);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--border-purple);
 }
 
 .glass-card {
-  background: rgba(23, 13, 38, 0.60);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: rgba(23, 13, 38, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(168, 85, 247, 0.12);
-  box-shadow: 0 4px 24px -4px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(168,85,247,0.04);
-  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(168,85,247,0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .glass-card:hover {
@@ -91,17 +91,17 @@
   box-shadow: 0 0 28px -4px rgba(124, 58, 237, 0.4);
 }
 
-/* ─── Optimized Ambient Glow Meshes (GPU-Accelerated) ─── */
+/* ─── Optimized Ambient Glow Meshes (GPU-Accelerated, Zero Filter Blur Overhead) ─── */
 .aurora-blob-1 {
   position: fixed;
   top: -10%;
   left: 15%;
   width: 650px;
   height: 650px;
-  background: radial-gradient(circle, rgba(67, 56, 202, 0.20) 0%, rgba(99, 102, 241, 0.08) 40%, transparent 75%);
-  filter: blur(50px);
+  background: radial-gradient(circle at center, rgba(67, 56, 202, 0.16) 0%, rgba(99, 102, 241, 0.06) 45%, transparent 72%);
   pointer-events: none;
   z-index: 0;
+  contain: strict;
   transform: translate3d(0, 0, 0);
   will-change: transform;
   animation: floatSlow 24s ease-in-out infinite alternate;
@@ -112,10 +112,10 @@
   right: -5%;
   width: 600px;
   height: 600px;
-  background: radial-gradient(circle, rgba(139, 92, 246, 0.18) 0%, rgba(67, 56, 202, 0.08) 45%, transparent 70%);
-  filter: blur(50px);
+  background: radial-gradient(circle at center, rgba(139, 92, 246, 0.14) 0%, rgba(67, 56, 202, 0.05) 50%, transparent 72%);
   pointer-events: none;
   z-index: 0;
+  contain: strict;
   transform: translate3d(0, 0, 0);
   will-change: transform;
   animation: floatReverse 28s ease-in-out infinite alternate;
@@ -126,44 +126,43 @@
   left: 45%;
   width: 450px;
   height: 450px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.10) 0%, rgba(7, 9, 19, 0) 70%);
-  filter: blur(40px);
+  background: radial-gradient(circle at center, rgba(99, 102, 241, 0.08) 0%, rgba(7, 9, 19, 0) 70%);
   pointer-events: none;
   z-index: 0;
+  contain: strict;
   transform: translate3d(0, 0, 0);
 }
 
 @keyframes floatSlow {
   0% { transform: translate3d(0px, 0px, 0) scale(1); }
-  100% { transform: translate3d(40px, 30px, 0) scale(1.05); }
+  100% { transform: translate3d(30px, 20px, 0) scale(1.03); }
 }
 @keyframes floatReverse {
   0% { transform: translate3d(0px, 0px, 0) scale(1); }
-  100% { transform: translate3d(-35px, -35px, 0) scale(1.04); }
+  100% { transform: translate3d(-25px, -25px, 0) scale(1.02); }
 }
 
-/* Prevent mobile GPU thermal throttling: pause animations & lighten blur on small screens */
+/* ─── Mobile Performance Armor: Disable Blurs on Phones & Tablets ─── */
 @media (max-width: 768px) {
-  .aurora-blob-1, .aurora-blob-2 {
-    animation: none !important;
-    filter: blur(40px) !important;
-    width: 360px !important;
-    height: 360px !important;
-    opacity: 0.65;
-  }
-  .aurora-blob-3 {
+  .aurora-blob-1, .aurora-blob-2, .aurora-blob-3 {
     display: none !important;
+  }
+  .liquid-glass, .bento-glass, .glass-panel, .glass-card {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(13, 17, 36, 0.96) !important;
   }
 }
 
 /* ─── Futuristic Liquid Glass & Specular System ─── */
 .liquid-glass, .bento-glass {
-  background: linear-gradient(145deg, rgba(13, 17, 36, 0.85) 0%, rgba(9, 12, 26, 0.92) 100%);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  background: linear-gradient(145deg, rgba(13, 17, 36, 0.88) 0%, rgba(9, 12, 26, 0.94) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(129, 140, 248, 0.14);
   position: relative;
-  box-shadow: 0 20px 50px -12px rgba(3, 4, 10, 0.85), inset 0 1px 1px 0 rgba(255, 255, 255, 0.14), inset 0 -1px 1px 0 rgba(99, 102, 241, 0.12);
+  box-shadow: 0 16px 40px -10px rgba(3, 4, 10, 0.8), inset 0 1px 1px 0 rgba(255, 255, 255, 0.12), inset 0 -1px 1px 0 rgba(99, 102, 241, 0.1);
+  contain: paint;
 }
 .liquid-glass::before, .bento-glass::before {
   content: '';
@@ -177,19 +176,16 @@
   border-radius: 9999px;
 }
 
+/* Child glass elements use translucent fills without nested backdrop blur */
 .liquid-glass-subtle {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .liquid-glass-pill {
-  background: rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.065);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.12);
 }
 
 .liquid-btn-primary {

@@ -73,7 +73,7 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({ isOp
   return (
     <div
       ref={dropdownRef}
-      className="absolute right-0 mt-3 w-80 sm:w-96 rounded-3xl liquid-glass border border-white/15 shadow-2xl z-50 overflow-hidden animate-slide-up backdrop-blur-2xl"
+      className="absolute right-0 mt-3 w-80 sm:w-96 rounded-3xl liquid-glass border border-white/15 shadow-2xl z-50 overflow-hidden animate-slide-up"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">

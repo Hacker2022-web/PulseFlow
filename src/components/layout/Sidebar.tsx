@@ -170,8 +170,12 @@ export const Sidebar: React.FC = () => {
               <Users2 className={`w-4 h-4 ${activeTab === 'collaborator' ? 'text-indigo-300' : 'text-zinc-400'}`} />
               <span>Collaborator</span>
             </div>
-            <span className="text-[10px] font-mono font-medium text-emerald-300 bg-emerald-500/15 border border-emerald-400/25 px-1.5 py-0.5 rounded-full">
-              {collaboratorPair?.status === 'active' ? 'Connected' : 'Connected'}
+            <span className={`text-[10px] font-mono font-medium px-1.5 py-0.5 rounded-full ${
+              collaboratorPair?.status === 'active'
+                ? 'text-emerald-300 bg-emerald-500/15 border border-emerald-400/25'
+                : 'text-indigo-300 bg-indigo-500/15 border border-indigo-400/25'
+            }`}>
+              {collaboratorPair?.status === 'active' ? 'Connected' : 'Duo Hub'}
             </span>
           </button>
 

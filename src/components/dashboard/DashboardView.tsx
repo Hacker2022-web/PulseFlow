@@ -374,7 +374,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
                               <span className="text-xl sm:text-2xl font-bold text-white tracking-tight">{habitsCompletedCount}</span>
                               <span className="text-xs text-zinc-400 font-medium">/ {activeHabits.length} complete</span>
                             </div>
-                            <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden p-0.5 backdrop-blur-md">
+                            <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden p-0.5">
                               <div
                                 className="bg-gradient-to-r from-indigo-400 to-violet-400 h-full rounded-full shadow-[0_0_10px_rgba(129,140,248,0.7)] transition-all duration-500"
                                 style={{ width: `${habitCompletionPercent}%` }}
@@ -392,7 +392,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
                               <span className="text-xl sm:text-2xl font-bold text-white tracking-tight">{dailyGoalsCompletedCount}</span>
                               <span className="text-xs text-zinc-400 font-medium">/ {dailyGoals.length} closed</span>
                             </div>
-                            <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden p-0.5 backdrop-blur-md">
+                            <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden p-0.5">
                               <div
                                 className="bg-gradient-to-r from-indigo-400 to-violet-400 h-full rounded-full shadow-[0_0_10px_rgba(129,140,248,0.7)] transition-all duration-500"
                                 style={{ width: `${dailyGoalsPercent}%` }}
@@ -412,7 +412,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
                               <span className="text-xl sm:text-2xl font-bold text-white tracking-tight">{formatCurrency(todaySpent)}</span>
                               <span className="text-xs text-zinc-400 font-medium">of {formatCurrency(dailyCap)} cap</span>
                             </div>
-                            <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden p-0.5 backdrop-blur-md">
+                            <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden p-0.5">
                               <div
                                 className={`h-full rounded-full transition-all duration-500 ${
                                   isUnderBudget
@@ -446,7 +446,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
                                 <span className="text-zinc-300 font-medium">Habit Consistency</span>
                                 <span className="text-white font-mono font-semibold">94%</span>
                               </div>
-                              <div className="w-full bg-white/10 h-1.5 rounded-full mt-2.5 overflow-hidden p-0.5 backdrop-blur-md">
+                              <div className="w-full bg-white/10 h-1.5 rounded-full mt-2.5 overflow-hidden p-0.5">
                                 <div className="bg-gradient-to-r from-indigo-300 to-violet-400 h-full w-[94%] rounded-full shadow-[0_0_10px_rgba(165,180,252,0.6)]" />
                               </div>
                             </div>
@@ -459,7 +459,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
                                   {formatCurrency(monthSpent)} / {formatCurrency(monthBudget)}
                                 </span>
                               </div>
-                              <div className="w-full bg-white/10 h-1.5 rounded-full mt-2.5 overflow-hidden p-0.5 backdrop-blur-md">
+                              <div className="w-full bg-white/10 h-1.5 rounded-full mt-2.5 overflow-hidden p-0.5">
                                 <div
                                   className="bg-zinc-300 h-full rounded-full transition-all duration-500"
                                   style={{ width: `${budgetPercent}%` }}
@@ -717,7 +717,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
                                 <span className="text-zinc-400 font-normal">/ {formatCurrency(monthBudget)}</span>
                               </span>
                             </div>
-                            <div className="w-full bg-white/10 h-1.5 rounded-full mt-2.5 overflow-hidden p-0.5 backdrop-blur-md">
+                            <div className="w-full bg-white/10 h-1.5 rounded-full mt-2.5 overflow-hidden p-0.5">
                               <div
                                 className="h-full bg-gradient-to-r from-indigo-300 to-violet-400 rounded-full shadow-[0_0_8px_rgba(165,180,252,0.7)] transition-all duration-500"
                                 style={{ width: `${budgetPercent}%` }}

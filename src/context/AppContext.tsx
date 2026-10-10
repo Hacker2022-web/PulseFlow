@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import {
   UserProfile,
@@ -232,13 +232,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
+  const isMountedRef = useRef(false);
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Save changes to localStorage with debounced sync animation
   const queueSync = useCallback(() => {
+    if (!isMountedRef.current) return;
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
     setSyncStatus('syncing');
-    const timer = setTimeout(() => {
+    syncTimeoutRef.current = setTimeout(() => {
       setSyncStatus(navigator.onLine ? 'synced' : 'offline');
-    }, 600);
-    return () => clearTimeout(timer);
+      syncTimeoutRef.current = null;
+    }, 500);
+  }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    };
   }, []);
 
   useEffect(() => {

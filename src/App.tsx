@@ -23,10 +23,10 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="bg-obsidian text-indigo-100 min-h-screen font-sans antialiased flex selection:bg-indigo-600 selection:text-white relative overflow-x-hidden h-screen">
-      {/* Dynamic Ambient Mesh Blobs */}
+      {/* Dynamic Ambient Mesh Blobs (Pure CSS Radial Gradients, Zero Filter Overhead) */}
       <div className="aurora-blob-1" />
       <div className="aurora-blob-2" />
-      <div className="aurora-blob-3" style={{ opacity: 0.35, filter: 'blur(120px)' }} />
+      <div className="aurora-blob-3" style={{ opacity: 0.25 }} />
 
       {/* Desktop Sidebar */}
       <Sidebar />
@@ -40,7 +40,7 @@ const AppContent: React.FC = () => {
 
         {/* Scrollable View Container */}
         <main
-          className={`flex-1 overflow-y-auto ${
+          className={`flex-1 overflow-y-auto overscroll-y-contain [transform:translateZ(0)] ${
             activeTab === 'dashboard'
               ? 'px-3.5 py-4 sm:p-6 lg:p-8 max-w-[1750px] w-full mx-auto'
               : 'px-3.5 sm:px-8 py-4 sm:py-6 max-w-7xl w-full mx-auto'

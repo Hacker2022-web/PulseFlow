@@ -45,16 +45,23 @@ const DemoOne = () => {
         />
       </div>
 
-      {/* Ambient diffuse blur glows for rich atmospheric depth */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[850px] h-[650px] bg-purple-600/18 rounded-full blur-[160px] pointer-events-none" />
-      <div className="absolute top-1/4 left-1/4 w-[550px] h-[450px] bg-fuchsia-600/12 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[400px] bg-violet-700/15 rounded-full blur-[150px] pointer-events-none" />
-
-      {/* Subtle micro-noise texture to prevent banding across monitors */}
+      {/* Ambient diffuse glows using performant radial gradients */}
       <div
-        className="absolute inset-0 pointer-events-none opacity-[0.035] mix-blend-overlay"
+        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px] pointer-events-none"
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+          background: 'radial-gradient(circle at center, rgba(147, 51, 234, 0.18) 0%, rgba(147, 51, 234, 0.05) 45%, transparent 70%)'
+        }}
+      />
+      <div
+        className="absolute top-1/4 left-1/4 w-[500px] h-[400px] pointer-events-none"
+        style={{
+          background: 'radial-gradient(circle at center, rgba(192, 38, 211, 0.12) 0%, rgba(192, 38, 211, 0.03) 50%, transparent 70%)'
+        }}
+      />
+      <div
+        className="absolute bottom-1/4 right-1/4 w-[450px] h-[350px] pointer-events-none"
+        style={{
+          background: 'radial-gradient(circle at center, rgba(109, 40, 217, 0.14) 0%, transparent 65%)'
         }}
       />
 
