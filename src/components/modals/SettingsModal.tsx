@@ -43,6 +43,7 @@ export const SettingsModal: React.FC = () => {
   const [fbApiKey, setFbApiKey] = useState(savedFb?.apiKey || '');
   const [fbProjectId, setFbProjectId] = useState(savedFb?.projectId || '');
   const [fbAuthDomain, setFbAuthDomain] = useState(savedFb?.authDomain || '');
+  const [fbAppId, setFbAppId] = useState(savedFb?.appId || '');
 
   const currencies: { code: CurrencyCode; label: string; symbol: string }[] = [
     { code: 'INR', label: 'Indian Rupee', symbol: '₹' },
@@ -86,7 +87,8 @@ export const SettingsModal: React.FC = () => {
       saveCustomFirebaseConfig({
         apiKey: fbApiKey,
         projectId: fbProjectId,
-        authDomain: fbAuthDomain || `${fbProjectId}.firebaseapp.com`
+        authDomain: fbAuthDomain || `${fbProjectId}.firebaseapp.com`,
+        appId: fbAppId
       });
     }
     alert('Firebase configuration saved. Reloading page to apply...');
@@ -289,7 +291,7 @@ export const SettingsModal: React.FC = () => {
                 <label className="block text-[11px] font-semibold text-zinc-400 mb-1">Project ID (projectId)</label>
                 <input
                   type="text"
-                  placeholder="synctrack-prod"
+                  placeholder="pulseflow-app"
                   value={fbProjectId}
                   onChange={(e) => setFbProjectId(e.target.value)}
                   className="w-full liquid-glass-subtle rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-white/30"
@@ -299,12 +301,23 @@ export const SettingsModal: React.FC = () => {
                 <label className="block text-[11px] font-semibold text-zinc-400 mb-1">Auth Domain (authDomain)</label>
                 <input
                   type="text"
-                  placeholder="synctrack-prod.firebaseapp.com"
+                  placeholder="pulseflow-app.firebaseapp.com"
                   value={fbAuthDomain}
                   onChange={(e) => setFbAuthDomain(e.target.value)}
                   className="w-full liquid-glass-subtle rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-white/30"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-zinc-400 mb-1">App ID (appId - Optional)</label>
+              <input
+                type="text"
+                placeholder="1:1234567890:web:abcdef123456"
+                value={fbAppId}
+                onChange={(e) => setFbAppId(e.target.value)}
+                className="w-full liquid-glass-subtle rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-white/30"
+              />
             </div>
 
             <div className="flex items-center justify-end gap-3 pt-2">

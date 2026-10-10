@@ -1,6 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as fbSignOut, User as FirebaseUser, Auth } from 'firebase/auth';
-import { getFirestore, Firestore } from 'firebase/firestore';
+import { getFirestore, Firestore, doc, setDoc, onSnapshot, Unsubscribe } from 'firebase/firestore';
 
 export interface FirebaseConfigParams {
   apiKey: string;
@@ -11,11 +11,11 @@ export interface FirebaseConfigParams {
   appId?: string;
 }
 
-const FB_CONFIG_STORAGE_KEY = 'synctrack_custom_firebase_config';
+const FB_CONFIG_STORAGE_KEY = 'pulseflow_custom_firebase_config';
 
 export function getSavedFirebaseConfig(): FirebaseConfigParams | null {
   try {
-    const raw = localStorage.getItem(FB_CONFIG_STORAGE_KEY);
+    const raw = localStorage.getItem(FB_CONFIG_STORAGE_KEY) || localStorage.getItem('synctrack_custom_firebase_config');
     if (raw) return JSON.parse(raw);
   } catch (e) {
     console.warn('Failed to parse saved Firebase config', e);
@@ -39,6 +39,7 @@ export function getSavedFirebaseConfig(): FirebaseConfigParams | null {
 export function saveCustomFirebaseConfig(config: FirebaseConfigParams | null): void {
   if (!config) {
     localStorage.removeItem(FB_CONFIG_STORAGE_KEY);
+    localStorage.removeItem('synctrack_custom_firebase_config');
   } else {
     localStorage.setItem(FB_CONFIG_STORAGE_KEY, JSON.stringify(config));
   }
@@ -87,6 +88,63 @@ class FirebaseService {
   async signOut(): Promise<void> {
     if (this.auth) {
       await fbSignOut(this.auth);
+    }
+  }
+
+  // Real-time Cloud Sync to Firestore
+  async syncUserData(userId: string, data: Record<string, any>): Promise<void> {
+    if (!this.db || !this.isConfigured) return;
+    try {
+      const userDocRef = doc(this.db, 'users', userId);
+      await setDoc(userDocRef, { ...data, updatedAt: new Date().toISOString() }, { merge: true });
+    } catch (err) {
+      console.warn('Firestore sync failed, local state preserved:', err);
+    }
+  }
+
+  // Real-time listener for multi-device sync
+  listenToUserData(userId: string, onUpdate: (data: any) => void): Unsubscribe | null {
+    if (!this.db || !this.isConfigured) return null;
+    try {
+      const userDocRef = doc(this.db, 'users', userId);
+      return onSnapshot(userDocRef, (snapshot) => {
+        if (snapshot.exists()) {
+          onUpdate(snapshot.data());
+        }
+      }, (err) => {
+        console.warn('Firestore snapshot error:', err);
+      });
+    } catch (err) {
+      console.warn('Failed to attach Firestore snapshot listener:', err);
+      return null;
+    }
+  }
+
+  // Real-time Duo Collaboration Room
+  async syncDuoRoom(pairCode: string, payload: Record<string, any>): Promise<void> {
+    if (!this.db || !this.isConfigured) return;
+    try {
+      const roomRef = doc(this.db, 'duo_rooms', pairCode);
+      await setDoc(roomRef, { ...payload, updatedAt: new Date().toISOString() }, { merge: true });
+    } catch (err) {
+      console.warn('Duo room sync failed:', err);
+    }
+  }
+
+  listenToDuoRoom(pairCode: string, onUpdate: (data: any) => void): Unsubscribe | null {
+    if (!this.db || !this.isConfigured) return null;
+    try {
+      const roomRef = doc(this.db, 'duo_rooms', pairCode);
+      return onSnapshot(roomRef, (snapshot) => {
+        if (snapshot.exists()) {
+          onUpdate(snapshot.data());
+        }
+      }, (err) => {
+        console.warn('Duo room listener error:', err);
+      });
+    } catch (err) {
+      console.warn('Failed to listen to duo room:', err);
+      return null;
     }
   }
 }

@@ -42,6 +42,7 @@ import {
   getTodayString,
   getDateOffsetString
 } from '../services/storage';
+import { firebaseService } from '../services/firebase';
 
 export type NavigationTab = 'dashboard' | 'habits' | 'goals' | 'expenses' | 'collaborator' | 'settings' | 'auth';
 
@@ -233,11 +234,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const isMountedRef = useRef(false);
+  const isRemoteUpdateRef = useRef(false);
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Save changes to localStorage with debounced sync animation
+  const latestDataRef = useRef({
+    habits, habitLogs, goals, dailyGoals, expenses, budgets, coopQuests, streakFreeze, subscriptions, bentoTiles, user
+  });
+  latestDataRef.current = {
+    habits, habitLogs, goals, dailyGoals, expenses, budgets, coopQuests, streakFreeze, subscriptions, bentoTiles, user
+  };
+
+  // Save changes to localStorage with debounced sync animation and Firestore push
   const queueSync = useCallback(() => {
-    if (!isMountedRef.current) return;
+    if (!isMountedRef.current || isRemoteUpdateRef.current) return;
     if (syncTimeoutRef.current) {
       clearTimeout(syncTimeoutRef.current);
     }
@@ -245,6 +254,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     syncTimeoutRef.current = setTimeout(() => {
       setSyncStatus(navigator.onLine ? 'synced' : 'offline');
       syncTimeoutRef.current = null;
+
+      // Sync to cloud Firestore when configured
+      if (firebaseService.isConfigured && latestDataRef.current.user?.uid) {
+        const { habits, habitLogs, goals, dailyGoals, expenses, budgets, coopQuests, streakFreeze, subscriptions, bentoTiles, user } = latestDataRef.current;
+        firebaseService.syncUserData(user.uid, {
+          habits,
+          habitLogs,
+          goals,
+          dailyGoals,
+          expenses,
+          budgets,
+          coopQuests,
+          streakFreeze,
+          subscriptions,
+          bentoTiles,
+          user
+        });
+      }
     }, 500);
   }, []);
 
@@ -254,6 +281,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
     };
   }, []);
+
+  // Listen to remote Firestore updates for live cross-device sync
+  useEffect(() => {
+    if (!firebaseService.isConfigured || !user?.uid) return;
+    const unsub = firebaseService.listenToUserData(user.uid, (cloudData) => {
+      if (!cloudData) return;
+      isRemoteUpdateRef.current = true;
+      if (cloudData.habits && Array.isArray(cloudData.habits)) setHabits(cloudData.habits);
+      if (cloudData.goals && Array.isArray(cloudData.goals)) setGoals(cloudData.goals);
+      if (cloudData.dailyGoals && Array.isArray(cloudData.dailyGoals)) setDailyGoals(cloudData.dailyGoals);
+      if (cloudData.expenses && Array.isArray(cloudData.expenses)) setExpenses(cloudData.expenses);
+      if (cloudData.budgets && Array.isArray(cloudData.budgets)) setBudgets(cloudData.budgets);
+      if (cloudData.coopQuests && Array.isArray(cloudData.coopQuests)) setCoopQuests(cloudData.coopQuests);
+      if (cloudData.subscriptions && Array.isArray(cloudData.subscriptions)) setSubscriptions(cloudData.subscriptions);
+      setTimeout(() => {
+        isRemoteUpdateRef.current = false;
+      }, 300);
+    });
+
+    return () => {
+      if (unsub) unsub();
+    };
+  }, [user?.uid]);
 
   useEffect(() => {
     LocalStorageService.setItem(STORAGE_KEYS.USER, user);
