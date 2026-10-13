@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users2,
   Copy,
@@ -23,7 +23,11 @@ import {
   Trophy,
   Plus,
   Award,
-  X
+  X,
+  Link2,
+  Loader2,
+  Radio,
+  ExternalLink
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -34,6 +38,8 @@ export const CollaboratorView: React.FC = () => {
     dailyGoals,
     collaboratorPair,
     partnerData,
+    myInviteCode,
+    regenerateInviteCode,
     sendManualNudge,
     sendReactionToPartner,
     togglePartnerDailyGoalSimulated,
@@ -49,10 +55,28 @@ export const CollaboratorView: React.FC = () => {
   } = useApp();
 
   const [copiedCode, setCopiedCode] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [partnerInviteInput, setPartnerInviteInput] = useState('');
-  const [connectMessage, setConnectMessage] = useState<string | null>(null);
+  const [connectFeedback, setConnectFeedback] = useState<{ success: boolean; message: string } | null>(null);
   const [nudgeFeedback, setNudgeFeedback] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<'partnerToday' | 'coopQuests' | 'mySharedItems' | 'settings'>('partnerToday');
+
+  // Detect URL ?invite=PULSE-XXXXXX for frictionless 1-tap onboarding
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const inviteParam = params.get('invite');
+      if (inviteParam) {
+        const clean = inviteParam.trim().toUpperCase();
+        setPartnerInviteInput(clean);
+        setSelectedTab('settings');
+      }
+    } catch {
+      // Ignore URL parsing errors if any
+    }
+  }, []);
 
   // New Quest Form State
   const [isCreateQuestModalOpen, setIsCreateQuestModalOpen] = useState(false);
@@ -67,21 +91,44 @@ export const CollaboratorView: React.FC = () => {
   const partnerDisplayName = collaboratorPair?.userBName || partnerProfile?.displayName || 'Partner';
   const partnerFirstName = partnerDisplayName.split(' ')[0] || 'Partner';
 
+  const currentInviteCode = collaboratorPair?.inviteCode || myInviteCode || 'PULSE-FLOW99';
+
   const handleCopyInvite = () => {
-    const code = collaboratorPair ? collaboratorPair.inviteCode : 'PULSE-7749';
-    navigator.clipboard.writeText(code);
+    navigator.clipboard.writeText(currentInviteCode);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
   };
 
-  const handleConnect = (e: React.FormEvent) => {
+  const handleCopyInviteLink = () => {
+    const inviteLink = `${window.location.origin}${window.location.pathname}?invite=${currentInviteCode}`;
+    navigator.clipboard.writeText(inviteLink);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2500);
+  };
+
+  const handleRegenerateCode = () => {
+    setIsRegenerating(true);
+    regenerateInviteCode();
+    setTimeout(() => setIsRegenerating(false), 500);
+  };
+
+  const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!partnerInviteInput.trim()) return;
-    const ok = connectPartnerWithCode(partnerInviteInput);
-    if (ok) {
-      setConnectMessage('Successfully paired with partner!');
-      setPartnerInviteInput('');
-      setTimeout(() => setConnectMessage(null), 3000);
+    const clean = partnerInviteInput.trim().toUpperCase();
+    if (!clean || isConnecting) return;
+    setIsConnecting(true);
+    setConnectFeedback(null);
+    try {
+      const res = await connectPartnerWithCode(clean);
+      setConnectFeedback(res);
+      if (res.success) {
+        setPartnerInviteInput('');
+        setTimeout(() => setSelectedTab('partnerToday'), 1500);
+      }
+    } catch (err: any) {
+      setConnectFeedback({ success: false, message: err?.message || 'Connection failed' });
+    } finally {
+      setIsConnecting(false);
     }
   };
 
@@ -863,83 +910,168 @@ export const CollaboratorView: React.FC = () => {
 
       {/* TAB 3: Invite & Pairing Management */}
       {selectedTab === 'settings' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Shareable Invite Card */}
-          <div className="liquid-glass rounded-3xl p-6 sm:p-8 flex flex-col justify-between">
+          <div className="liquid-glass rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xl">
             <div>
               <div className="w-12 h-12 rounded-2xl liquid-glass-pill text-indigo-300 flex items-center justify-center mb-4">
                 <Share2 className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-white tracking-tight">Your Shareable Invite Code</h3>
-              <p className="text-xs text-zinc-400 mt-1 mb-6 font-medium">
-                Share this code or link with a friend to pair accounts in one tap.
+              <h3 className="text-lg font-bold text-white tracking-tight">Your Unique Invite Code</h3>
+              <p className="text-xs text-zinc-400 mt-1 mb-4 font-medium">
+                Every user receives a dedicated code. Send it or share your direct link with your friend to pair accounts seamlessly.
               </p>
 
-              <div className="p-4 rounded-2xl liquid-glass-subtle flex items-center justify-between mb-4">
-                <div className="font-mono text-xl font-bold text-white tracking-wider">
-                  {collaboratorPair ? collaboratorPair.inviteCode : 'SYNC-7749'}
+              {/* Status Indicator */}
+              {collaboratorPair ? (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-400/20 text-emerald-300 text-[11px] font-mono mb-4">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Duo Room Active: {currentInviteCode}</span>
                 </div>
+              ) : (
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-300 text-[11px] font-mono mb-4">
+                  <Radio className="w-3.5 h-3.5 animate-pulse text-indigo-400" />
+                  <span>Cloud Discovery Ready • Real-Time Pairing</span>
+                </div>
+              )}
+
+              {/* Code Box */}
+              <div className="p-4 rounded-2xl liquid-glass-subtle border border-white/10 flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="font-mono text-2xl font-black text-white tracking-widest drop-shadow-sm select-all">
+                    {currentInviteCode}
+                  </div>
+                  {!collaboratorPair && (
+                    <button
+                      onClick={handleRegenerateCode}
+                      disabled={isRegenerating}
+                      title="Generate fresh unique code"
+                      className="p-1.5 rounded-lg liquid-glass-subtle text-zinc-400 hover:text-white transition cursor-pointer hover:bg-white/10"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isRegenerating ? 'animate-spin text-indigo-400' : ''}`} />
+                    </button>
+                  )}
+                </div>
+                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-white/5 text-zinc-400 border border-white/5">
+                  Unique Code
+                </span>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3">
                 <button
                   onClick={handleCopyInvite}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl liquid-btn-primary text-white font-medium text-xs tracking-wide transition cursor-pointer"
+                  className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl liquid-btn-primary text-white font-medium text-xs tracking-wide transition cursor-pointer shadow-lg"
                 >
                   {copiedCode ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>{copiedCode ? 'Copied!' : 'Copy Code'}</span>
+                  <span>{copiedCode ? 'Copied Code!' : 'Copy Code'}</span>
+                </button>
+                <button
+                  onClick={handleCopyInviteLink}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl liquid-glass-subtle hover:bg-white/10 text-white font-medium text-xs tracking-wide border border-white/10 transition cursor-pointer"
+                >
+                  {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Link2 className="w-3.5 h-3.5 text-indigo-300" />}
+                  <span>{copiedLink ? 'Link Copied!' : 'Copy Direct Link'}</span>
                 </button>
               </div>
             </div>
 
-            <div className="text-[11px] font-mono text-zinc-400">
-              Either partner can disconnect at any time without losing personal records.
+            {/* Architecture Info Banner */}
+            <div className="mt-6 pt-4 border-t border-white/10 space-y-1.5 text-[11px] text-zinc-400">
+              <div className="flex items-center gap-1.5 text-zinc-300 font-medium">
+                <Shield className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Scalable Duo Channels</span>
+              </div>
+              <p className="leading-relaxed">
+                Each code maps to an isolated cloud channel. As multiple friends join, each duo operates in its own real-time room without conflicts.
+              </p>
             </div>
           </div>
 
           {/* Join / Connect Form */}
-          <div className="liquid-glass rounded-3xl p-6 sm:p-8 flex flex-col justify-between">
+          <div className="liquid-glass rounded-3xl p-6 sm:p-8 flex flex-col justify-between shadow-xl">
             <div>
               <div className="w-12 h-12 rounded-2xl liquid-glass-pill text-violet-300 flex items-center justify-center mb-4">
                 <UserPlus className="w-6 h-6" />
               </div>
               <h3 className="text-lg font-bold text-white tracking-tight">Connect with Partner</h3>
               <p className="text-xs text-zinc-400 mt-1 mb-6 font-medium">
-                Enter an invite code or email from your accountability partner.
+                Enter your friend's invite code to pair your accounts immediately.
               </p>
 
               <form onSubmit={handleConnect} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Partner Invite Code</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. SYNC-8492"
-                    value={partnerInviteInput}
-                    onChange={(e) => setPartnerInviteInput(e.target.value)}
-                    className="w-full liquid-glass-subtle rounded-xl px-3.5 py-2.5 text-xs text-white uppercase tracking-wider font-mono focus:outline-none focus:border-white/30"
-                  />
+                  <label className="block text-xs font-semibold text-zinc-300 mb-1">Partner's Invite Code</label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. PULSE-8X9J2K"
+                      value={partnerInviteInput}
+                      onChange={(e) => setPartnerInviteInput(e.target.value.toUpperCase())}
+                      className="w-full liquid-glass-subtle rounded-xl px-3.5 py-2.5 text-sm text-white uppercase tracking-wider font-mono focus:outline-none focus:border-white/30 border border-white/10 placeholder-zinc-500"
+                    />
+                    {partnerInviteInput && (
+                      <button
+                        type="button"
+                        onClick={() => setPartnerInviteInput('')}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 text-xs cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                {connectMessage && (
-                  <div className="p-3 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-400/25 text-xs font-medium">
-                    {connectMessage}
+                {connectFeedback && (
+                  <div className={`p-3 rounded-xl border text-xs font-medium flex items-center gap-2 ${
+                    connectFeedback.success
+                      ? 'bg-emerald-500/15 text-emerald-300 border-emerald-400/25'
+                      : 'bg-rose-500/15 text-rose-300 border-rose-400/25'
+                  }`}>
+                    {connectFeedback.success ? (
+                      <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                    )}
+                    <span>{connectFeedback.message}</span>
                   </div>
                 )}
 
                 <button
                   type="submit"
-                  className="w-full py-2.5 rounded-xl liquid-btn-primary text-white font-medium text-xs tracking-wide transition cursor-pointer"
+                  disabled={isConnecting || !partnerInviteInput.trim()}
+                  className="w-full py-2.5 rounded-xl liquid-btn-primary text-white font-medium text-xs tracking-wide transition cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                 >
-                  Connect Partner
+                  {isConnecting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Pairing via Cloud Discovery...</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" />
+                      <span>Connect Partner</span>
+                    </>
+                  )}
                 </button>
               </form>
             </div>
 
-            {collaboratorPair && (
-              <button
-                onClick={disconnectPartner}
-                className="mt-6 text-xs text-rose-400 hover:text-rose-300 font-medium text-left transition cursor-pointer"
-              >
-                Disconnect current partner
-              </button>
+            {collaboratorPair ? (
+              <div className="mt-6 pt-4 border-t border-white/10 flex items-center justify-between">
+                <span className="text-[11px] text-zinc-400">Currently paired with {partnerDisplayName}</span>
+                <button
+                  onClick={disconnectPartner}
+                  className="text-xs text-rose-400 hover:text-rose-300 font-medium transition cursor-pointer hover:underline"
+                >
+                  Disconnect Duo
+                </button>
+              </div>
+            ) : (
+              <div className="mt-6 pt-4 border-t border-white/10 text-[11px] font-mono text-zinc-500">
+                Personal expenses and private habits remain 100% confidential.
+              </div>
             )}
           </div>
         </div>

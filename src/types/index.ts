@@ -11,6 +11,7 @@ export interface UserProfile {
   quietHoursStart: string; // e.g. "22:00"
   quietHoursEnd: string;   // e.g. "08:00"
   notificationsEnabled: boolean;
+  inviteCode?: string;
 }
 
 export type HabitFrequency = 'daily' | 'weekdays' | 'weekends' | 'custom_weekly';

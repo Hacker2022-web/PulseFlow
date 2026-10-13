@@ -53,6 +53,15 @@ export function getDateOffsetString(daysOffset: number): string {
   return `${year}-${month}-${day}`;
 }
 
+export function generateUniqueInviteCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let rand = '';
+  for (let i = 0; i < 6; i++) {
+    rand += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return `PULSE-${rand}`;
+}
+
 // -------------------------------------------------------------
 // CLEAN PRODUCTION SLATE (ZERO DEMO DATA)
 // -------------------------------------------------------------
@@ -67,7 +76,8 @@ export const INITIAL_USER: UserProfile = {
   createdAt: new Date().toISOString(),
   quietHoursStart: '22:00',
   quietHoursEnd: '08:00',
-  notificationsEnabled: true
+  notificationsEnabled: true,
+  inviteCode: generateUniqueInviteCode()
 };
 
 export const INITIAL_PAIR: CollaboratorPair | null = null;
@@ -201,7 +211,7 @@ export const SAMPLE_DEMO_DATA: {
     userAAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
     userBAvatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=250&q=80',
     status: 'active' as const,
-    inviteCode: 'PULSE-7749',
+    inviteCode: generateUniqueInviteCode(),
     createdAt: new Date(Date.now() - 14 * 86400000).toISOString()
   },
   habits: [

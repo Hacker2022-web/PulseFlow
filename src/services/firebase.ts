@@ -1,6 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as fbSignOut, User as FirebaseUser, Auth } from 'firebase/auth';
-import { getFirestore, Firestore, doc, setDoc, onSnapshot, Unsubscribe } from 'firebase/firestore';
+import { getFirestore, Firestore, doc, setDoc, getDoc, onSnapshot, Unsubscribe } from 'firebase/firestore';
 
 export interface FirebaseConfigParams {
   apiKey: string;
@@ -132,9 +132,9 @@ class FirebaseService {
 
   // Real-time Duo Collaboration Room
   async syncDuoRoom(pairCode: string, payload: Record<string, any>): Promise<void> {
-    if (!this.db || !this.isConfigured) return;
+    if (!this.db || !this.isConfigured || !pairCode) return;
     try {
-      const roomRef = doc(this.db, 'duo_rooms', pairCode);
+      const roomRef = doc(this.db, 'duo_rooms', pairCode.toUpperCase().trim());
       await setDoc(roomRef, { ...payload, updatedAt: new Date().toISOString() }, { merge: true });
     } catch (err) {
       console.warn('Duo room sync failed:', err);
@@ -142,9 +142,9 @@ class FirebaseService {
   }
 
   listenToDuoRoom(pairCode: string, onUpdate: (data: any) => void): Unsubscribe | null {
-    if (!this.db || !this.isConfigured) return null;
+    if (!this.db || !this.isConfigured || !pairCode) return null;
     try {
-      const roomRef = doc(this.db, 'duo_rooms', pairCode);
+      const roomRef = doc(this.db, 'duo_rooms', pairCode.toUpperCase().trim());
       return onSnapshot(roomRef, (snapshot) => {
         if (snapshot.exists()) {
           onUpdate(snapshot.data());
@@ -154,6 +154,110 @@ class FirebaseService {
       });
     } catch (err) {
       console.warn('Failed to listen to duo room:', err);
+      return null;
+    }
+  }
+
+  // Publish unique invite code to cloud registry for discovery
+  async publishInvite(inviteCode: string, creator: { uid: string; displayName?: string; email?: string; photoURL?: string }): Promise<void> {
+    if (!this.db || !this.isConfigured || !inviteCode) return;
+    try {
+      const cleanCode = inviteCode.toUpperCase().trim();
+      const inviteRef = doc(this.db, 'duo_invites', cleanCode);
+      await setDoc(inviteRef, {
+        inviteCode: cleanCode,
+        creatorUid: creator.uid,
+        creatorName: creator.displayName || creator.email?.split('@')[0] || 'Duo Creator',
+        creatorEmail: creator.email || '',
+        creatorPhotoURL: creator.photoURL || '',
+        status: 'pending',
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      console.log('✅ [PulseFlow Cloud] Published unique invite code to Firestore:', cleanCode);
+    } catch (err) {
+      console.warn('⚠️ [PulseFlow Cloud] Failed to publish invite to Firestore:', err);
+    }
+  }
+
+  // Fetch invite data from cloud
+  async getInvite(inviteCode: string): Promise<any | null> {
+    if (!this.db || !this.isConfigured || !inviteCode) return null;
+    try {
+      const cleanCode = inviteCode.toUpperCase().trim();
+      const inviteRef = doc(this.db, 'duo_invites', cleanCode);
+      const snap = await getDoc(inviteRef);
+      if (snap.exists()) {
+        return snap.data();
+      }
+      return null;
+    } catch (err) {
+      console.warn('⚠️ [PulseFlow Cloud] Failed to fetch invite from Firestore:', err);
+      return null;
+    }
+  }
+
+  // Accept invite and establish real-time duo link
+  async acceptInvite(inviteCode: string, partner: { uid: string; displayName?: string; email?: string; photoURL?: string }): Promise<any | null> {
+    if (!this.db || !this.isConfigured || !inviteCode) return null;
+    try {
+      const cleanCode = inviteCode.toUpperCase().trim();
+      const inviteRef = doc(this.db, 'duo_invites', cleanCode);
+      const snap = await getDoc(inviteRef);
+      if (!snap.exists()) return null;
+
+      const inviteData = snap.data();
+      if (inviteData.creatorUid === partner.uid) {
+        throw new Error('You cannot pair with your own invite code.');
+      }
+
+      const partnerName = partner.displayName || partner.email?.split('@')[0] || 'Duo Member';
+      await setDoc(inviteRef, {
+        status: 'accepted',
+        partnerUid: partner.uid,
+        partnerName,
+        partnerEmail: partner.email || '',
+        partnerPhotoURL: partner.photoURL || '',
+        acceptedAt: new Date().toISOString()
+      }, { merge: true });
+
+      // Initialize duo collaboration room
+      await this.syncDuoRoom(cleanCode, {
+        roomId: cleanCode,
+        userAId: inviteData.creatorUid,
+        userAName: inviteData.creatorName,
+        userAAvatar: inviteData.creatorPhotoURL || '',
+        userBId: partner.uid,
+        userBName: partnerName,
+        userBAvatar: partner.photoURL || '',
+        status: 'active',
+        createdAt: new Date().toISOString()
+      });
+
+      return inviteData;
+    } catch (err) {
+      console.warn('⚠️ [PulseFlow Cloud] Error accepting invite:', err);
+      throw err;
+    }
+  }
+
+  // Listen to invite acceptance in real-time
+  listenToDuoInvite(inviteCode: string, onAccepted: (data: any) => void): Unsubscribe | null {
+    if (!this.db || !this.isConfigured || !inviteCode) return null;
+    try {
+      const cleanCode = inviteCode.toUpperCase().trim();
+      const inviteRef = doc(this.db, 'duo_invites', cleanCode);
+      return onSnapshot(inviteRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          if (data.status === 'accepted') {
+            onAccepted(data);
+          }
+        }
+      }, (err) => {
+        console.warn('Invite listener error:', err);
+      });
+    } catch (err) {
+      console.warn('Failed to listen to invite:', err);
       return null;
     }
   }

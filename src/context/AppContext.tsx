@@ -41,7 +41,8 @@ import {
   SAMPLE_DEMO_DATA,
   PartnerSharedData,
   getTodayString,
-  getDateOffsetString
+  getDateOffsetString,
+  generateUniqueInviteCode
 } from '../services/storage';
 import { firebaseService } from '../services/firebase';
 
@@ -92,12 +93,14 @@ interface AppContextType {
   getMonthlyBudgetTotal: () => number;
   formatCurrency: (amount: number) => string;
 
-  // Collaborator & Nudge Operations
+  // Collaborator & Duo Operations
+  myInviteCode: string;
+  regenerateInviteCode: () => string;
+  connectPartnerWithCode: (code: string) => Promise<{ success: boolean; message: string }>;
+  disconnectPartner: () => void;
   sendManualNudge: (targetItemId: string, targetItemTitle: string) => { success: boolean; message: string };
   sendReactionToPartner: (itemId: string, itemType: 'habit' | 'goal' | 'dailyGoal', emoji: string) => void;
   togglePartnerDailyGoalSimulated: (goalId: string) => void;
-  connectPartnerWithCode: (code: string) => boolean;
-  disconnectPartner: () => void;
   toggleItemSharing: (itemType: 'habit' | 'dailyGoal' | 'goal', itemId: string) => void;
 
   // Shared Co-op Quests
@@ -159,9 +162,38 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<UserProfile>(() =>
-    LocalStorageService.getItem(STORAGE_KEYS.USER, INITIAL_USER)
-  );
+  const [user, setUser] = useState<UserProfile>(() => {
+    const loaded = LocalStorageService.getItem(STORAGE_KEYS.USER, INITIAL_USER);
+    if (!loaded.inviteCode || loaded.inviteCode === 'PULSE-7749' || loaded.inviteCode === 'SYNC-7749') {
+      const uniqueCode = generateUniqueInviteCode();
+      const updated = { ...loaded, inviteCode: uniqueCode };
+      LocalStorageService.setItem(STORAGE_KEYS.USER, updated);
+      return updated;
+    }
+    return loaded;
+  });
+
+  const myInviteCode = user.inviteCode || 'PULSE-FLOW99';
+
+  const regenerateInviteCode = useCallback(() => {
+    const freshCode = generateUniqueInviteCode();
+    setUser(prev => {
+      const updated = { ...prev, inviteCode: freshCode };
+      LocalStorageService.setItem(STORAGE_KEYS.USER, updated);
+      return updated;
+    });
+    if (firebaseService.isConfigured) {
+      firebaseService.publishInvite(freshCode, user);
+    }
+    return freshCode;
+  }, [user]);
+
+  // Auto-publish unique invite code to cloud for discovery
+  useEffect(() => {
+    if (user?.inviteCode && user?.uid && firebaseService.isConfigured) {
+      firebaseService.publishInvite(user.inviteCode, user);
+    }
+  }, [user?.inviteCode, user?.uid, user?.displayName, user?.email]);
 
   const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
 
@@ -245,6 +277,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [bentoTiles, setBentoTiles] = useState<BentoTileConfig[]>(() =>
     LocalStorageService.getItem(STORAGE_KEYS.BENTO_TILES, INITIAL_BENTO_TILES)
   );
+
+  // Notifications - declared early so effects and sync handlers can use it
+  const addNotification = useCallback((notif: Omit<AppNotification, 'id' | 'timestamp' | 'read'>) => {
+    const newNotif: AppNotification = {
+      ...notif,
+      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      read: false
+    };
+    setNotifications(prev => [newNotif, ...prev.slice(0, 40)]);
+  }, []);
 
   // Monitor online status
   useEffect(() => {
@@ -358,6 +401,84 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
     return () => unsub();
   }, []);
+
+  // Listen for real-time invite acceptance
+  useEffect(() => {
+    if (!myInviteCode || collaboratorPair || !firebaseService.isConfigured) return;
+    const unsub = firebaseService.listenToDuoInvite(myInviteCode, (acceptedData) => {
+      if (acceptedData.status === 'accepted' && acceptedData.partnerUid && acceptedData.partnerUid !== user.uid) {
+        console.log('🎉 [PulseFlow Cloud] Partner joined your duo!', acceptedData);
+        const newPair: CollaboratorPair = {
+          id: `pair_${Date.now()}`,
+          userAId: user.uid,
+          userBId: acceptedData.partnerUid,
+          userAName: user.displayName || user.email?.split('@')[0] || 'My Account',
+          userBName: acceptedData.partnerName || 'Duo Partner',
+          userAAvatar: user.photoURL || '',
+          userBAvatar: acceptedData.partnerPhotoURL || '',
+          status: 'active',
+          inviteCode: myInviteCode,
+          createdAt: acceptedData.acceptedAt || new Date().toISOString()
+        };
+        setCollaboratorPair(newPair);
+        setPartnerData(prev => ({
+          ...prev,
+          partnerProfile: {
+            uid: acceptedData.partnerUid,
+            displayName: acceptedData.partnerName || 'Duo Partner',
+            photoURL: acceptedData.partnerPhotoURL || '',
+            streakDays: 0,
+            completionRate: 0
+          }
+        }));
+        try {
+          confetti({
+            particleCount: 75,
+            spread: 80,
+            origin: { y: 0.6 }
+          });
+        } catch {}
+        addNotification({
+          type: 'partner_completed',
+          title: 'Duo Partner Connected! 🤝',
+          message: `${acceptedData.partnerName || 'Your partner'} joined your duo via code ${myInviteCode}!`,
+          linkTab: 'collaborator'
+        });
+      }
+    });
+    return () => {
+      if (unsub) unsub();
+    };
+  }, [myInviteCode, collaboratorPair, user, addNotification]);
+
+  // Listen to active duo room for real-time live sync
+  useEffect(() => {
+    if (!collaboratorPair?.inviteCode || !firebaseService.isConfigured) return;
+    const pairCode = collaboratorPair.inviteCode;
+    const unsub = firebaseService.listenToDuoRoom(pairCode, (roomData) => {
+      if (!roomData) return;
+      if (roomData.habits && Array.isArray(roomData.habits)) {
+        setPartnerData(prev => ({ ...prev, habits: roomData.habits }));
+      }
+      if (roomData.dailyGoals && Array.isArray(roomData.dailyGoals)) {
+        setPartnerData(prev => ({ ...prev, dailyGoals: roomData.dailyGoals }));
+      }
+      if (roomData.lastNudge && roomData.lastNudge.recipientId === user.uid) {
+        const nudge = roomData.lastNudge;
+        if (nudge.timestamp && Date.now() - new Date(nudge.timestamp).getTime() < 15000) {
+          addNotification({
+            type: 'partner_nudge',
+            title: `Nudge from ${nudge.senderName || 'Partner'} ⚡`,
+            message: nudge.message || 'Keep the momentum going!',
+            linkTab: 'collaborator'
+          });
+        }
+      }
+    });
+    return () => {
+      if (unsub) unsub();
+    };
+  }, [collaboratorPair?.inviteCode, user.uid, addNotification]);
 
   // Auto-clean any stale demo data from previous test sessions or cached localStorage
   useEffect(() => {
@@ -564,16 +685,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 700);
   }, []);
 
-  // Notifications
-  const addNotification = useCallback((notif: Omit<AppNotification, 'id' | 'timestamp' | 'read'>) => {
-    const newNotif: AppNotification = {
-      ...notif,
-      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-      timestamp: new Date().toISOString(),
-      read: false
-    };
-    setNotifications(prev => [newNotif, ...prev.slice(0, 40)]);
-  }, []);
+  // Notifications helpers
 
   const markNotificationRead = useCallback((id: string) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
@@ -950,15 +1062,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       )
     }));
 
-    // Trigger simulated push notification response from partner
+    if (collaboratorPair?.inviteCode && firebaseService.isConfigured) {
+      firebaseService.syncDuoRoom(collaboratorPair.inviteCode, {
+        lastNudge: {
+          senderId: user.uid,
+          senderName: user.displayName || user.email?.split('@')[0] || 'Partner',
+          recipientId: collaboratorPair.userBId,
+          targetItemId,
+          targetItemTitle,
+          message: newNudge.message,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
+
+    // Trigger confirmation notification
     setTimeout(() => {
       addNotification({
         type: 'partner_nudge',
         title: `Nudge Sent to ${partnerData.partnerProfile.displayName || 'Partner'}`,
-        message: `${partnerData.partnerProfile.displayName || 'Partner'} received your nudge for "${targetItemTitle}" via Web Push!`,
+        message: `${partnerData.partnerProfile.displayName || 'Partner'} received your nudge for "${targetItemTitle}"!`,
         linkTab: 'collaborator'
       });
-    }, 1200);
+    }, 800);
 
     return {
       success: true,
@@ -998,6 +1124,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
     });
 
+    if (collaboratorPair?.inviteCode && firebaseService.isConfigured) {
+      firebaseService.syncDuoRoom(collaboratorPair.inviteCode, {
+        lastReaction: newReaction
+      });
+    }
+
     confetti({
       particleCount: 20,
       spread: 40,
@@ -1032,45 +1164,109 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [addNotification]);
 
-  // Connect partner with invite code
-  const connectPartnerWithCode = useCallback((code: string): boolean => {
-    if (!code || code.trim().length < 4) return false;
-    const partnerName = code.toUpperCase().includes('DEMO') ? 'Alex Rivera' : 'Accountability Partner';
-    const newPair: CollaboratorPair = {
-      id: `pair_${Date.now()}`,
-      userAId: user.uid,
-      userBId: `partner_${Date.now()}`,
-      userAName: user.displayName || 'Primary User',
-      userBName: partnerName,
-      userAAvatar: user.photoURL,
-      userBAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=250&q=80',
-      status: 'active',
-      inviteCode: code.toUpperCase().trim(),
-      createdAt: new Date().toISOString()
-    };
-    setCollaboratorPair(newPair);
-    setPartnerData(prev => ({
-      ...prev,
-      partnerProfile: {
-        uid: newPair.userBId,
-        displayName: partnerName,
-        photoURL: newPair.userBAvatar,
-        streakDays: 1,
-        completionRate: 100
+  // Connect partner with invite code (Scalable Cloud Firestore + Local Fallback)
+  const connectPartnerWithCode = useCallback(async (code: string): Promise<{ success: boolean; message: string }> => {
+    const cleanCode = code.toUpperCase().trim();
+    if (!cleanCode || cleanCode.length < 5) {
+      return { success: false, message: 'Please enter a valid invite code (e.g. PULSE-XXXXXX).' };
+    }
+    if (cleanCode === myInviteCode || cleanCode === user.inviteCode) {
+      return { success: false, message: 'You cannot connect with your own invite code! Share this code with a friend instead.' };
+    }
+
+    try {
+      let partnerInfo: any = null;
+      if (firebaseService.isConfigured) {
+        try {
+          partnerInfo = await firebaseService.acceptInvite(cleanCode, user);
+        } catch (err: any) {
+          if (err.message && err.message.includes('own invite code')) {
+            return { success: false, message: err.message };
+          }
+          console.warn('Firebase acceptInvite note:', err);
+        }
       }
-    }));
-    addNotification({
-      type: 'partner_completed',
-      title: 'Partner Connected! 🤝',
-      message: `You and ${partnerName} are now accountability partners.`,
-      linkTab: 'collaborator'
-    });
-    return true;
-  }, [user, addNotification]);
+
+      const partnerName = partnerInfo?.creatorName || (cleanCode.includes('DEMO') ? 'Alex Rivera' : `Duo Partner (${cleanCode.slice(-4)})`);
+      const partnerUid = partnerInfo?.creatorUid || `partner_${cleanCode}`;
+      const partnerAvatar = partnerInfo?.creatorPhotoURL || '';
+
+      const newPair: CollaboratorPair = {
+        id: `pair_${cleanCode}_${Date.now()}`,
+        userAId: user.uid,
+        userBId: partnerUid,
+        userAName: user.displayName || user.email?.split('@')[0] || 'My Account',
+        userBName: partnerName,
+        userAAvatar: user.photoURL || '',
+        userBAvatar: partnerAvatar,
+        status: 'active',
+        inviteCode: cleanCode,
+        createdAt: new Date().toISOString()
+      };
+
+      setCollaboratorPair(newPair);
+      setPartnerData(prev => ({
+        ...prev,
+        partnerProfile: {
+          uid: partnerUid,
+          displayName: partnerName,
+          photoURL: partnerAvatar,
+          streakDays: 0,
+          completionRate: 0
+        }
+      }));
+
+      // Broadcast our shared habits and goals to the duo room
+      if (firebaseService.isConfigured) {
+        const sharedHabits = habits.filter(h => h.sharedWithPartner);
+        const sharedGoals = dailyGoals.filter(dg => dg.sharedWithPartner);
+        firebaseService.syncDuoRoom(cleanCode, {
+          userBId: user.uid,
+          userBName: user.displayName || user.email?.split('@')[0] || 'Duo Partner',
+          userBAvatar: user.photoURL || '',
+          habits: sharedHabits,
+          dailyGoals: sharedGoals,
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      try {
+        confetti({
+          particleCount: 50,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      } catch {}
+
+      addNotification({
+        type: 'partner_completed',
+        title: 'Partner Connected! 🤝',
+        message: `You and ${partnerName} are now paired via code ${cleanCode}.`,
+        linkTab: 'collaborator'
+      });
+
+      return { success: true, message: `Successfully connected with ${partnerName}!` };
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Failed to connect with invite code.' };
+    }
+  }, [user, myInviteCode, habits, dailyGoals, addNotification]);
 
   const disconnectPartner = useCallback(() => {
+    if (collaboratorPair?.inviteCode && firebaseService.isConfigured) {
+      firebaseService.syncDuoRoom(collaboratorPair.inviteCode, {
+        status: 'disconnected',
+        disconnectedAt: new Date().toISOString()
+      });
+    }
     setCollaboratorPair(null);
-  }, []);
+    LocalStorageService.removeItem(STORAGE_KEYS.PAIR);
+    addNotification({
+      type: 'partner_completed',
+      title: 'Partner Disconnected',
+      message: 'You have left the duo room. Your personal data is intact.',
+      linkTab: 'collaborator'
+    });
+  }, [collaboratorPair, addNotification]);
 
   const toggleItemSharing = useCallback((
     itemType: 'habit' | 'dailyGoal' | 'goal',
@@ -1519,6 +1715,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         getTotalSpentThisMonth,
         getMonthlyBudgetTotal,
         formatCurrency,
+        myInviteCode,
+        regenerateInviteCode,
         sendManualNudge,
         sendReactionToPartner,
         togglePartnerDailyGoalSimulated,
