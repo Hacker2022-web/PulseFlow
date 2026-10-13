@@ -126,7 +126,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenQuickAdd }) => {
           >
             <Bell className="w-4 h-4" />
             {unreadNotificationCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-indigo-300 shadow-[0_0_6px_rgba(165,180,252,0.9)]" />
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-indigo-500 text-white font-mono text-[10px] font-bold flex items-center justify-center shadow-[0_0_8px_rgba(99,102,241,0.8)]">
+                {unreadNotificationCount}
+              </span>
             )}
           </button>
           <NotificationDropdown isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} />

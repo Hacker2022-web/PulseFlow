@@ -161,7 +161,7 @@ export const CollaboratorView: React.FC = () => {
                   <span className="text-xs text-zinc-400 font-mono">1-to-1 Accountability</span>
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-extrabold text-white mt-1 tracking-tight drop-shadow-sm">
-                  Paired with <span className="text-periwinkle">{partnerProfile.displayName}</span>
+                  Paired with <span className="text-periwinkle">{partnerDisplayName}</span>
                 </h2>
                 <p className="text-xs text-zinc-300 mt-1 font-medium">
                   Mutual visibility for daily goals and habit consistency. Expenses remain 100% private.
@@ -379,7 +379,18 @@ export const CollaboratorView: React.FC = () => {
               </div>
 
               <div className="space-y-3">
-                {partnerData.dailyGoals.map((dg) => (
+                {partnerData.dailyGoals.length === 0 ? (
+                  <div className="py-8 text-center liquid-glass-subtle rounded-2xl border border-white/5 p-5">
+                    <CheckCircle2 className="w-8 h-8 text-indigo-400/60 mx-auto mb-2" />
+                    <p className="text-xs font-semibold text-zinc-200">
+                      {partnerFirstName} has not added any shared tasks for today
+                    </p>
+                    <p className="text-[11px] text-zinc-400 mt-1 max-w-xs mx-auto leading-relaxed">
+                      When {partnerFirstName} adds tasks and marks them as shared, they will appear here live with instant check-off sync.
+                    </p>
+                  </div>
+                ) : (
+                  partnerData.dailyGoals.map((dg) => (
                   <div
                     key={dg.id}
                     className={`p-3.5 rounded-2xl liquid-glass-subtle transition-all ${
@@ -463,8 +474,9 @@ export const CollaboratorView: React.FC = () => {
                       </div>
                     )}
                   </div>
-                ))}
-              </div>
+                ))
+              )}
+            </div>
             </div>
           </div>
 
@@ -483,7 +495,18 @@ export const CollaboratorView: React.FC = () => {
               </div>
 
               <div className="space-y-3">
-                {partnerData.habits.map((h) => (
+                {partnerData.habits.length === 0 ? (
+                  <div className="py-8 text-center liquid-glass-subtle rounded-2xl border border-white/5 p-5">
+                    <Sparkles className="w-8 h-8 text-indigo-400/60 mx-auto mb-2" />
+                    <p className="text-xs font-semibold text-zinc-200">
+                      {partnerFirstName} has not shared habits yet
+                    </p>
+                    <p className="text-[11px] text-zinc-400 mt-1 max-w-xs mx-auto leading-relaxed">
+                      Habits shared by {partnerFirstName} for mutual accountability will sync here in real time.
+                    </p>
+                  </div>
+                ) : (
+                  partnerData.habits.map((h) => (
                   <div
                     key={h.id}
                     className="p-3.5 rounded-2xl liquid-glass-subtle flex items-center justify-between gap-3"
@@ -524,8 +547,9 @@ export const CollaboratorView: React.FC = () => {
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
+                ))
+              )}
+            </div>
             </div>
 
             {/* Nudge rules summary note */}

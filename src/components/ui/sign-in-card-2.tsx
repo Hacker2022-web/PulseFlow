@@ -99,12 +99,6 @@ export function Component({ embedded = false, className }: ComponentProps = {}) 
         });
 
         setAuthSuccess(`Welcome back, ${formattedName}!`);
-        addNotification({
-          type: 'daily_goal_reminder',
-          title: 'Signed in successfully 👋',
-          message: `Logged in as ${email}. Your session is active.`,
-          linkTab: 'dashboard'
-        });
 
         setTimeout(() => {
           setActiveTab('dashboard');
@@ -135,12 +129,6 @@ export function Component({ embedded = false, className }: ComponentProps = {}) 
         });
 
         setAuthSuccess(`Account created for ${name}!`);
-        addNotification({
-          type: 'daily_goal_reminder',
-          title: 'Account Created 🎉',
-          message: `Welcome to PulseFlow, ${name}! Your habits and goals are ready.`,
-          linkTab: 'dashboard'
-        });
 
         setTimeout(() => {
           setActiveTab('dashboard');

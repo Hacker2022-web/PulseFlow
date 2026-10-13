@@ -312,6 +312,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const isRemoteUpdateRef = useRef(false);
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const collaboratorPairRef = useRef<CollaboratorPair | null>(collaboratorPair);
+  collaboratorPairRef.current = collaboratorPair;
+  const lastProcessedEventIdRef = useRef<string | null>(null);
+
   const latestDataRef = useRef({
     habits, habitLogs, goals, dailyGoals, expenses, budgets, coopQuests, streakFreeze, subscriptions, bentoTiles, user
   });
@@ -346,6 +350,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           bentoTiles,
           user
         });
+
+        // Also push shared habits and goals to duo room in real-time
+        if (collaboratorPairRef.current?.inviteCode) {
+          const sharedHabits = habits.filter(h => h.sharedWithPartner);
+          const sharedDailyGoals = dailyGoals.filter(dg => dg.sharedWithPartner);
+          firebaseService.updateDuoMember(collaboratorPairRef.current.inviteCode, user.uid, {
+            uid: user.uid,
+            displayName: user.displayName || user.email?.split('@')[0] || 'Duo Partner',
+            photoURL: user.photoURL || '',
+            habits: sharedHabits,
+            dailyGoals: sharedDailyGoals,
+            updatedAt: new Date().toISOString()
+          });
+        }
       }
     }, 500);
   }, []);
@@ -402,12 +420,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => unsub();
   }, []);
 
-  // Listen for real-time invite acceptance
+  // Listen for real-time invite acceptance on Account A (creator)
   useEffect(() => {
     if (!myInviteCode || collaboratorPair || !firebaseService.isConfigured) return;
     const unsub = firebaseService.listenToDuoInvite(myInviteCode, (acceptedData) => {
       if (acceptedData.status === 'accepted' && acceptedData.partnerUid && acceptedData.partnerUid !== user.uid) {
-        console.log('🎉 [PulseFlow Cloud] Partner joined your duo!', acceptedData);
+        console.log('🎉 [PulseFlow Cloud] Partner joined your duo room!', acceptedData);
         const newPair: CollaboratorPair = {
           id: `pair_${Date.now()}`,
           userAId: user.uid,
@@ -421,6 +439,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           createdAt: acceptedData.acceptedAt || new Date().toISOString()
         };
         setCollaboratorPair(newPair);
+        collaboratorPairRef.current = newPair;
         setPartnerData(prev => ({
           ...prev,
           partnerProfile: {
@@ -431,17 +450,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             completionRate: 0
           }
         }));
+
+        // Immediately publish Creator's shared habits and daily goals to duo room
+        const sharedHabits = habits.filter(h => h.sharedWithPartner);
+        const sharedDailyGoals = dailyGoals.filter(dg => dg.sharedWithPartner);
+        firebaseService.updateDuoMember(myInviteCode, user.uid, {
+          uid: user.uid,
+          displayName: user.displayName || user.email?.split('@')[0] || 'Duo Host',
+          photoURL: user.photoURL || '',
+          habits: sharedHabits,
+          dailyGoals: sharedDailyGoals,
+          updatedAt: new Date().toISOString()
+        });
+
         try {
           confetti({
-            particleCount: 75,
-            spread: 80,
+            particleCount: 85,
+            spread: 90,
             origin: { y: 0.6 }
           });
         } catch {}
+
         addNotification({
           type: 'partner_completed',
           title: 'Duo Partner Connected! 🤝',
-          message: `${acceptedData.partnerName || 'Your partner'} joined your duo via code ${myInviteCode}!`,
+          message: `${acceptedData.partnerName || 'Your partner'} joined your duo room via code ${myInviteCode}!`,
           linkTab: 'collaborator'
         });
       }
@@ -449,36 +482,84 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       if (unsub) unsub();
     };
-  }, [myInviteCode, collaboratorPair, user, addNotification]);
+  }, [myInviteCode, collaboratorPair, user, habits, dailyGoals, addNotification]);
 
-  // Listen to active duo room for real-time live sync
+  // Listen to active duo room for real-time live sync across both partners
   useEffect(() => {
     if (!collaboratorPair?.inviteCode || !firebaseService.isConfigured) return;
     const pairCode = collaboratorPair.inviteCode;
     const unsub = firebaseService.listenToDuoRoom(pairCode, (roomData) => {
       if (!roomData) return;
-      if (roomData.habits && Array.isArray(roomData.habits)) {
-        setPartnerData(prev => ({ ...prev, habits: roomData.habits }));
+
+      // Extract the partner's data from roomData.members map
+      if (roomData.members && typeof roomData.members === 'object') {
+        const memberEntries = Object.entries(roomData.members);
+        const partnerEntry = memberEntries.find(([uid]) => uid !== user.uid);
+        if (partnerEntry) {
+          const partner = partnerEntry[1] as any;
+          setPartnerData(prev => ({
+            partnerProfile: {
+              uid: partner.uid || prev.partnerProfile.uid,
+              displayName: partner.displayName || prev.partnerProfile.displayName || collaboratorPair.userBName || 'Partner',
+              photoURL: partner.photoURL || prev.partnerProfile.photoURL || collaboratorPair.userBAvatar || '',
+              streakDays: typeof partner.streakDays === 'number' ? partner.streakDays : prev.partnerProfile.streakDays,
+              completionRate: typeof partner.completionRate === 'number' ? partner.completionRate : prev.partnerProfile.completionRate
+            },
+            habits: Array.isArray(partner.habits) ? partner.habits : prev.habits,
+            dailyGoals: Array.isArray(partner.dailyGoals) ? partner.dailyGoals : prev.dailyGoals
+          }));
+
+          // Keep collaboratorPair partner name and avatar synced
+          if (partner.displayName && partner.displayName !== collaboratorPair.userBName) {
+            setCollaboratorPair(prev => prev ? { ...prev, userBName: partner.displayName, userBAvatar: partner.photoURL || prev.userBAvatar } : null);
+          }
+        }
       }
-      if (roomData.dailyGoals && Array.isArray(roomData.dailyGoals)) {
-        setPartnerData(prev => ({ ...prev, dailyGoals: roomData.dailyGoals }));
-      }
-      if (roomData.lastNudge && roomData.lastNudge.recipientId === user.uid) {
-        const nudge = roomData.lastNudge;
-        if (nudge.timestamp && Date.now() - new Date(nudge.timestamp).getTime() < 15000) {
-          addNotification({
-            type: 'partner_nudge',
-            title: `Nudge from ${nudge.senderName || 'Partner'} ⚡`,
-            message: nudge.message || 'Keep the momentum going!',
-            linkTab: 'collaborator'
-          });
+
+      // Handle real-time incoming events (nudges, cheers, task completions)
+      if (roomData.lastEvent && typeof roomData.lastEvent === 'object') {
+        const evt = roomData.lastEvent;
+        const isRecent = evt.timestamp && (Date.now() - new Date(evt.timestamp).getTime() < 25000);
+        const isFromPartner = evt.senderId && evt.senderId !== user.uid;
+
+        if (isRecent && isFromPartner && lastProcessedEventIdRef.current !== evt.id) {
+          lastProcessedEventIdRef.current = evt.id;
+          if (evt.type === 'nudge') {
+            addNotification({
+              type: 'partner_nudge',
+              title: `⚡ Nudge from ${evt.senderName || 'Partner'}`,
+              message: evt.message || 'Keep the momentum going on your goals!',
+              linkTab: 'collaborator'
+            });
+          } else if (evt.type === 'reaction') {
+            addNotification({
+              type: 'partner_reaction',
+              title: `${evt.senderName || 'Partner'} cheered you! 🎉`,
+              message: evt.message || 'Sent cheer on your progress!',
+              linkTab: 'collaborator'
+            });
+          } else if (evt.type === 'partner_connected') {
+            addNotification({
+              type: 'partner_completed',
+              title: 'Duo Room Connected! 🤝',
+              message: `${evt.senderName || 'Your partner'} joined your duo room in real time!`,
+              linkTab: 'collaborator'
+            });
+          } else if (evt.type === 'goal_completed') {
+            addNotification({
+              type: 'partner_completed',
+              title: `Partner Finished Task: ${evt.message} ✅`,
+              message: `${evt.senderName || 'Your partner'} completed a daily priority task today!`,
+              linkTab: 'collaborator'
+            });
+          }
         }
       }
     });
     return () => {
       if (unsub) unsub();
     };
-  }, [collaboratorPair?.inviteCode, user.uid, addNotification]);
+  }, [collaboratorPair?.inviteCode, collaboratorPair?.userBName, collaboratorPair?.userBAvatar, user.uid, addNotification]);
 
   // Auto-clean any stale demo data from previous test sessions or cached localStorage
   useEffect(() => {
@@ -941,6 +1022,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           spread: 70,
           origin: { y: 0.7 }
         });
+        if (collaboratorPairRef.current?.inviteCode && dg.sharedWithPartner && firebaseService.isConfigured) {
+          firebaseService.sendDuoEvent(collaboratorPairRef.current.inviteCode, {
+            type: 'goal_completed',
+            senderId: user.uid,
+            senderName: user.displayName || user.email?.split('@')[0] || 'Partner',
+            recipientId: collaboratorPairRef.current.userBId,
+            message: dg.title
+          });
+        }
       }
       return {
         ...dg,
@@ -1063,16 +1153,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
 
     if (collaboratorPair?.inviteCode && firebaseService.isConfigured) {
-      firebaseService.syncDuoRoom(collaboratorPair.inviteCode, {
-        lastNudge: {
-          senderId: user.uid,
-          senderName: user.displayName || user.email?.split('@')[0] || 'Partner',
-          recipientId: collaboratorPair.userBId,
-          targetItemId,
-          targetItemTitle,
-          message: newNudge.message,
-          timestamp: new Date().toISOString()
-        }
+      firebaseService.sendDuoEvent(collaboratorPair.inviteCode, {
+        type: 'nudge',
+        senderId: user.uid,
+        senderName: user.displayName || user.email?.split('@')[0] || 'Partner',
+        recipientId: partnerData.partnerProfile.uid || collaboratorPair.userBId,
+        message: newNudge.message,
+        data: { targetItemId, targetItemTitle }
       });
     }
 
@@ -1125,8 +1212,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     if (collaboratorPair?.inviteCode && firebaseService.isConfigured) {
-      firebaseService.syncDuoRoom(collaboratorPair.inviteCode, {
-        lastReaction: newReaction
+      firebaseService.sendDuoEvent(collaboratorPair.inviteCode, {
+        type: 'reaction',
+        senderId: user.uid,
+        senderName: user.displayName || user.email?.split('@')[0] || 'Partner',
+        recipientId: partnerData.partnerProfile.uid || collaboratorPair.userBId,
+        message: `${emoji} reaction on your ${itemType === 'habit' ? 'habit' : 'task'}!`,
+        data: { targetItemId: itemId, itemType, emoji }
       });
     }
 
@@ -1135,7 +1227,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       spread: 40,
       origin: { y: 0.8 }
     });
-  }, [user]);
+  }, [user, collaboratorPair, partnerData]);
 
   // Simulated live action for testing Partner View
   const togglePartnerDailyGoalSimulated = useCallback((goalId: string) => {
@@ -1205,6 +1297,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       setCollaboratorPair(newPair);
+      collaboratorPairRef.current = newPair;
       setPartnerData(prev => ({
         ...prev,
         partnerProfile: {
@@ -1216,14 +1309,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }));
 
-      // Broadcast our shared habits and goals to the duo room
+      // Broadcast our shared habits and goals to the duo room members map
       if (firebaseService.isConfigured) {
         const sharedHabits = habits.filter(h => h.sharedWithPartner);
         const sharedGoals = dailyGoals.filter(dg => dg.sharedWithPartner);
-        firebaseService.syncDuoRoom(cleanCode, {
-          userBId: user.uid,
-          userBName: user.displayName || user.email?.split('@')[0] || 'Duo Partner',
-          userBAvatar: user.photoURL || '',
+        firebaseService.updateDuoMember(cleanCode, user.uid, {
+          uid: user.uid,
+          displayName: user.displayName || user.email?.split('@')[0] || 'Duo Partner',
+          photoURL: user.photoURL || '',
           habits: sharedHabits,
           dailyGoals: sharedGoals,
           updatedAt: new Date().toISOString()
@@ -1232,8 +1325,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       try {
         confetti({
-          particleCount: 50,
-          spread: 70,
+          particleCount: 80,
+          spread: 85,
           origin: { y: 0.6 }
         });
       } catch {}
@@ -1241,7 +1334,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addNotification({
         type: 'partner_completed',
         title: 'Partner Connected! 🤝',
-        message: `You and ${partnerName} are now paired via code ${cleanCode}.`,
+        message: `You and ${partnerName} are now paired in real time via room ${cleanCode}.`,
         linkTab: 'collaborator'
       });
 

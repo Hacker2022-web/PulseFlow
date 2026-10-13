@@ -298,7 +298,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
               >
                 <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 {unreadNotificationCount > 0 && (
-                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-indigo-300 shadow-[0_0_6px_rgba(165,180,252,0.9)]" />
+                  <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-0.5 rounded-full bg-indigo-500 text-white font-mono text-[9px] font-bold flex items-center justify-center shadow-[0_0_6px_rgba(99,102,241,0.8)]">
+                    {unreadNotificationCount}
+                  </span>
                 )}
               </button>
               <NotificationDropdown isOpen={isNotifOpen} onClose={() => setIsNotifOpen(false)} />

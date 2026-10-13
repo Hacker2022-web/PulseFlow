@@ -203,7 +203,9 @@ class FirebaseService {
       const cleanCode = inviteCode.toUpperCase().trim();
       const inviteRef = doc(this.db, 'duo_invites', cleanCode);
       const snap = await getDoc(inviteRef);
-      if (!snap.exists()) return null;
+      if (!snap.exists()) {
+        throw new Error(`Invite code ${cleanCode} was not found in the cloud registry.`);
+      }
 
       const inviteData = snap.data();
       if (inviteData.creatorUid === partner.uid) {
@@ -220,7 +222,7 @@ class FirebaseService {
         acceptedAt: new Date().toISOString()
       }, { merge: true });
 
-      // Initialize duo collaboration room
+      // Initialize duo collaboration room with connection event
       await this.syncDuoRoom(cleanCode, {
         roomId: cleanCode,
         userAId: inviteData.creatorUid,
@@ -230,13 +232,62 @@ class FirebaseService {
         userBName: partnerName,
         userBAvatar: partner.photoURL || '',
         status: 'active',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        lastEvent: {
+          id: `evt_conn_${Date.now()}`,
+          type: 'partner_connected',
+          senderId: partner.uid,
+          senderName: partnerName,
+          recipientId: inviteData.creatorUid,
+          message: `${partnerName} has joined your duo in real time!`,
+          timestamp: new Date().toISOString()
+        }
       });
 
       return inviteData;
     } catch (err) {
       console.warn('⚠️ [PulseFlow Cloud] Error accepting invite:', err);
       throw err;
+    }
+  }
+
+  // Update isolated member state in duo room (prevents overwriting partner state)
+  async updateDuoMember(pairCode: string, userUid: string, memberData: Record<string, any>): Promise<void> {
+    if (!this.db || !this.isConfigured || !pairCode || !userUid) return;
+    try {
+      const cleanCode = pairCode.toUpperCase().trim();
+      const roomRef = doc(this.db, 'duo_rooms', cleanCode);
+      await setDoc(roomRef, {
+        status: 'active',
+        updatedAt: new Date().toISOString(),
+        members: {
+          [userUid]: {
+            ...memberData,
+            updatedAt: new Date().toISOString()
+          }
+        }
+      }, { merge: true });
+    } catch (err) {
+      console.warn('Failed to update duo member:', err);
+    }
+  }
+
+  // Send real-time event (nudge, cheer reaction, task completion) to duo room
+  async sendDuoEvent(pairCode: string, event: { type: string; senderId: string; senderName: string; recipientId: string; message: string; data?: any }): Promise<void> {
+    if (!this.db || !this.isConfigured || !pairCode) return;
+    try {
+      const cleanCode = pairCode.toUpperCase().trim();
+      const roomRef = doc(this.db, 'duo_rooms', cleanCode);
+      await setDoc(roomRef, {
+        lastEvent: {
+          id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+          ...event,
+          timestamp: new Date().toISOString()
+        },
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    } catch (err) {
+      console.warn('Failed to send duo event:', err);
     }
   }
 
