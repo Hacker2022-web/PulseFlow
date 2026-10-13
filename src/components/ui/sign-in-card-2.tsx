@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
-import { Mail, Lock, Eye, EyeClosed, ArrowRight, User, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Mail, Lock, Eye, EyeClosed, ArrowRight, User, AlertCircle, CheckCircle2, LogOut } from 'lucide-react';
 
 import { cn } from "@/lib/utils";
 import { loginSchema, signUpSchema, LoginInput, SignUpInput } from "@/lib/schemas/auth";
@@ -31,9 +31,10 @@ export interface ComponentProps {
 }
 
 export function Component({ embedded = false, className }: ComponentProps = {}) {
-  const { updateUserProfile, setActiveTab, addNotification } = useApp();
+  const { user, signOut, updateUserProfile, setActiveTab, addNotification } = useApp();
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
+  const [switchAccountMode, setSwitchAccountMode] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   // Form Fields
@@ -209,50 +210,135 @@ export function Component({ embedded = false, className }: ComponentProps = {}) 
               boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.75), 0 0 35px -5px rgba(126, 34, 206, 0.25)'
             }}
           >
-            {/* Header: Circle Avatar & Title */}
-            <div className="text-center space-y-1.5 mb-6">
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.4 }}
-                className="mx-auto w-10 h-10 rounded-full border border-purple-400/25 bg-purple-950/70 flex items-center justify-center text-white font-bold text-sm shadow-inner mb-3"
-              >
-                S
-              </motion.div>
+            {/* Logged-In User Profile Card */}
+            {user?.email && !switchAccountMode ? (
+              <div className="space-y-5">
+                <div className="text-center space-y-2 mb-2">
+                  <div className="mx-auto w-16 h-16 rounded-2xl border border-purple-400/30 bg-purple-950/70 overflow-hidden flex items-center justify-center text-white font-bold text-xl shadow-inner ring-2 ring-purple-500/20">
+                    {user.photoURL ? (
+                      <img src={user.photoURL} alt={user.displayName} className="w-full h-full object-cover" />
+                    ) : (
+                      <span>{user.displayName?.slice(0, 2).toUpperCase() || 'PF'}</span>
+                    )}
+                  </div>
 
-              <h1 className="text-2xl font-bold tracking-tight text-white font-sans">
-                {mode === 'signin' ? 'Welcome Back' : 'Create Account'}
-              </h1>
-              
-              <p className="text-xs text-purple-200/60 font-medium">
-                {mode === 'signin' ? 'Sign in to continue to StyleMe' : 'Join StyleMe & start tracking your habits'}
-              </p>
-            </div>
+                  <h1 className="text-xl font-bold tracking-tight text-white font-sans">
+                    {user.displayName || 'Active Account'}
+                  </h1>
 
-            {/* Success Banner */}
-            {authSuccess && (
-              <motion.div
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2"
-              >
-                <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span>{authSuccess}</span>
-              </motion.div>
-            )}
+                  <p className="text-xs text-purple-200/70 font-mono">
+                    {user.email}
+                  </p>
 
-            {/* General Form Error */}
-            {errors.form && (
-              <div className="mb-4 p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{errors.form}</span>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span>Signed In &amp; Synced</span>
+                  </div>
+                </div>
+
+                {authSuccess && (
+                  <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>{authSuccess}</span>
+                  </div>
+                )}
+
+                <div className="space-y-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('dashboard')}
+                    className="w-full h-11 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-medium text-xs tracking-wide transition shadow-lg shadow-purple-950/50 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+                  >
+                    <span>Open PulseFlow Dashboard</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setIsLoading(true);
+                      await signOut();
+                      setIsLoading(false);
+                      setAuthSuccess('Signed out successfully.');
+                      setTimeout(() => setAuthSuccess(null), 2500);
+                    }}
+                    disabled={isLoading}
+                    className="w-full h-11 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-200 font-medium text-xs transition flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out of Account</span>
+                  </button>
+
+                  <div className="pt-2 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setSwitchAccountMode(true)}
+                      className="text-xs text-purple-300/60 hover:text-white transition underline cursor-pointer"
+                    >
+                      Sign in with another account
+                    </button>
+                  </div>
+                </div>
               </div>
-            )}
+            ) : (
+              <>
+                {/* Switch back button if previously authenticated */}
+                {user?.email && switchAccountMode && (
+                  <div className="mb-4 text-left">
+                    <button
+                      type="button"
+                      onClick={() => setSwitchAccountMode(false)}
+                      className="text-xs text-purple-300/70 hover:text-white transition flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>← Back to {user.displayName || user.email}</span>
+                    </button>
+                  </div>
+                )}
 
-            {/* Authentication Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Name Field (Sign Up mode only) */}
-              {mode === 'signup' && (
+                {/* Header: Circle Avatar & Title */}
+                <div className="text-center space-y-1.5 mb-6">
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.4 }}
+                    className="mx-auto w-10 h-10 rounded-full border border-purple-400/25 bg-purple-950/70 flex items-center justify-center text-white font-bold text-sm shadow-inner mb-3"
+                  >
+                    P
+                  </motion.div>
+
+                  <h1 className="text-2xl font-bold tracking-tight text-white font-sans">
+                    {mode === 'signin' ? 'Welcome to PulseFlow' : 'Create Account'}
+                  </h1>
+                  
+                  <p className="text-xs text-purple-200/60 font-medium">
+                    {mode === 'signin' ? 'Sign in to continue to PulseFlow' : 'Join PulseFlow & start tracking your habits'}
+                  </p>
+                </div>
+
+                {/* Success Banner */}
+                {authSuccess && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mb-4 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2"
+                  >
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>{authSuccess}</span>
+                  </motion.div>
+                )}
+
+                {/* General Form Error */}
+                {errors.form && (
+                  <div className="mb-4 p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{errors.form}</span>
+                  </div>
+                )}
+
+                {/* Authentication Form */}
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {/* Name Field (Sign Up mode only) */}
+                  {mode === 'signup' && (
                 <div>
                   <div className="relative flex items-center">
                     <User className={`absolute left-3.5 w-4 h-4 transition-colors ${
@@ -456,7 +542,9 @@ export function Component({ embedded = false, className }: ComponentProps = {}) 
                 )}
               </div>
             </form>
-          </div>
+          </>
+        )}
+      </div>
         </motion.div>
       </motion.div>
   );

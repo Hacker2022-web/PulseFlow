@@ -15,10 +15,15 @@ import {
   SlidersHorizontal,
   Sparkles,
   Zap,
-  Info
+  Info,
+  Clock,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { getTodayString } from '../../services/storage';
+import { getTodayString, getDateOffsetString } from '../../services/storage';
+import { TaskPriority } from '../../types';
+import { TaskCountdownTimer, PriorityBadge } from '../ui/TaskCountdownTimer';
 import { NotificationDropdown } from '../common/NotificationDropdown';
 import { BentoAiDebriefTile } from './BentoAiDebriefTile';
 import { BentoCoopQuestsTile } from './BentoCoopQuestsTile';
@@ -33,11 +38,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
   const {
     user,
     habits,
+    habitLogs,
     toggleHabitToday,
     getHabitStreak,
     dailyGoals,
     toggleDailyGoal,
     addDailyGoal,
+    deleteDailyGoal,
     expenses,
     budgets,
     getTotalSpentThisMonth,
@@ -55,6 +62,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
 
   const [searchQuery, setSearchQuery] = useState('');
   const [newGoalText, setNewGoalText] = useState('');
+  const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>('high');
+  const [newTaskDeadline, setNewTaskDeadline] = useState<string>('');
+  const [showTaskOptions, setShowTaskOptions] = useState<boolean>(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isBentoModalOpen, setIsBentoModalOpen] = useState(false);
   const [showForecastDetail, setShowForecastDetail] = useState(false);
@@ -85,22 +95,46 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
     .reduce((sum, e) => sum + e.amount, 0);
 
   const monthSpent = getTotalSpentThisMonth();
-  const monthBudget = getMonthlyBudgetTotal() || 2600;
+  const monthBudget = getMonthlyBudgetTotal();
   const budgetRatio = monthBudget > 0 ? (monthSpent / monthBudget) : 0;
   const budgetPercent = Math.min(100, Math.round(budgetRatio * 100));
   const remainingBudget = Math.max(0, monthBudget - monthSpent);
 
-  const dailyCap = Math.round(monthBudget / 30);
-  const isUnderBudget = todaySpent <= dailyCap;
+  const dailyCap = monthBudget > 0 ? Math.round(monthBudget / 30) : 0;
+  const isUnderBudget = dailyCap > 0 ? todaySpent <= dailyCap : true;
 
-  // Productivity index calculation
-  const productivityIndex = Math.min(
-    100,
-    Math.round(
-      ((activeHabits.length ? (habitsCompletedCount / activeHabits.length) : 0.8) * 50) +
-      ((dailyGoals.length ? (dailyGoalsCompletedCount / dailyGoals.length) : 0.8) * 50)
-    )
-  );
+  // Productivity index calculation (0 when starting from clean slate)
+  const productivityIndex = (activeHabits.length === 0 && dailyGoals.length === 0)
+    ? 0
+    : Math.min(
+        100,
+        Math.round(
+          ((activeHabits.length ? (habitsCompletedCount / activeHabits.length) : 0) * 50) +
+          ((dailyGoals.length ? (dailyGoalsCompletedCount / dailyGoals.length) : 0) * 50)
+        )
+      );
+
+  // 7-day habit consistency calculation
+  const weeklyConsistency = useMemo(() => {
+    if (activeHabits.length === 0) return 0;
+    let totalPossible = activeHabits.length * 7;
+    let totalCompleted = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = getDateOffsetString(-i);
+      const dayCompleted = activeHabits.filter(h => {
+        return habitLogs.some(l => l.habitId === h.id && l.date === d && l.completed);
+      }).length;
+      totalCompleted += dayCompleted;
+    }
+    return Math.min(100, Math.round((totalCompleted / totalPossible) * 100));
+  }, [activeHabits, habitLogs]);
+
+  // Week range label for Weekly Overview
+  const weekRangeLabel = useMemo(() => {
+    const end = new Date();
+    const start = new Date(Date.now() - 6 * 86400000);
+    return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+  }, []);
 
   // Filtered lists if search query is entered
   const filteredHabits = useMemo(() => {
@@ -123,8 +157,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
   const handleAddGoal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newGoalText.trim()) return;
-    addDailyGoal(newGoalText.trim(), true);
+    addDailyGoal(
+      newGoalText.trim(),
+      true,
+      newTaskDeadline && newTaskDeadline.includes('T') ? newTaskDeadline.split('T')[1]?.slice(0, 5) : newTaskDeadline || undefined,
+      newTaskPriority,
+      newTaskDeadline || undefined
+    );
     setNewGoalText('');
+    setNewTaskDeadline('');
+    setShowTaskOptions(false);
   };
 
   // Helper for category initials
@@ -148,7 +190,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
         .join('')
         .slice(0, 2)
         .toUpperCase()
-    : 'AR';
+    : '--';
 
   // Format today's date
   const formattedToday = new Date().toLocaleDateString('en-US', {
@@ -438,17 +480,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
                             <div className="flex items-center gap-2">
                               <h3 className="text-sm font-semibold text-white tracking-tight">Weekly Overview</h3>
                             </div>
-                            <span className="text-[11px] font-mono text-zinc-400">Oct 3 - Oct 9</span>
+                            <span className="text-[11px] font-mono text-zinc-400">{weekRangeLabel}</span>
                           </div>
                           <div className="mt-4 space-y-3.5">
                             {/* Habit Consistency */}
                             <div className="p-3.5 rounded-2xl liquid-glass-subtle">
                               <div className="flex items-center justify-between text-xs">
                                 <span className="text-zinc-300 font-medium">Habit Consistency</span>
-                                <span className="text-white font-mono font-semibold">94%</span>
+                                <span className="text-white font-mono font-semibold">{weeklyConsistency}%</span>
                               </div>
                               <div className="w-full bg-white/10 h-1.5 rounded-full mt-2.5 overflow-hidden p-0.5">
-                                <div className="bg-gradient-to-r from-indigo-300 to-violet-400 h-full w-[94%] rounded-full shadow-[0_0_10px_rgba(165,180,252,0.6)]" />
+                                <div
+                                  className="bg-gradient-to-r from-indigo-300 to-violet-400 h-full rounded-full shadow-[0_0_10px_rgba(165,180,252,0.6)] transition-all duration-500"
+                                  style={{ width: `${weeklyConsistency}%` }}
+                                />
                               </div>
                             </div>
 
@@ -463,7 +508,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
                               <div className="w-full bg-white/10 h-1.5 rounded-full mt-2.5 overflow-hidden p-0.5">
                                 <div
                                   className="bg-zinc-300 h-full rounded-full transition-all duration-500"
-                                  style={{ width: `${budgetPercent}%` }}
+                                  style={{ width: `${monthBudget > 0 ? budgetPercent : 0}%` }}
                                 />
                               </div>
                             </div>
@@ -614,27 +659,158 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
                             </button>
                           </div>
 
-                          <form onSubmit={handleAddGoal} className="my-3 flex items-center gap-2">
-                            <input
-                              value={newGoalText}
-                              onChange={(e) => setNewGoalText(e.target.value)}
-                              className="flex-1 liquid-glass-subtle rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-400 focus:outline-none focus:border-white/30 transition-all"
-                              placeholder="Add a priority task..."
-                              type="text"
-                            />
-                            <button
-                              type="submit"
-                              className="px-3.5 py-2 rounded-xl liquid-glass-pill hover:bg-white/[0.1] text-white text-xs font-medium transition-all cursor-pointer shrink-0"
-                            >
-                              Add
-                            </button>
+                          {/* Priority Task Input Form with Priority & Deadline */}
+                          <form onSubmit={handleAddGoal} className="my-3 space-y-2">
+                            <div className="flex items-center gap-2">
+                              <input
+                                value={newGoalText}
+                                onChange={(e) => {
+                                  setNewGoalText(e.target.value);
+                                  if (!showTaskOptions && e.target.value.trim()) {
+                                    setShowTaskOptions(true);
+                                  }
+                                }}
+                                onFocus={() => setShowTaskOptions(true)}
+                                className="flex-1 liquid-glass-subtle rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-400 focus:outline-none focus:border-indigo-400/50 transition-all"
+                                placeholder="Add a priority must-do..."
+                                type="text"
+                              />
+                              <button
+                                type="submit"
+                                className="px-3.5 py-2 rounded-xl liquid-btn-primary text-white text-xs font-semibold tracking-wide transition-all cursor-pointer shrink-0"
+                              >
+                                Add
+                              </button>
+                            </div>
+
+                            {/* Priority & Deadline Picker Controls */}
+                            {showTaskOptions && (
+                              <div className="p-3 rounded-2xl liquid-glass-subtle border border-indigo-400/20 space-y-2.5 animate-fade-in">
+                                {/* Priority Select */}
+                                <div>
+                                  <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between">
+                                    <span>Priority</span>
+                                    <span className="text-zinc-500 font-normal">Select urgency</span>
+                                  </div>
+                                  <div className="grid grid-cols-4 gap-1.5">
+                                    {(['urgent', 'high', 'medium', 'low'] as TaskPriority[]).map((p) => {
+                                      const isSelected = newTaskPriority === p;
+                                      return (
+                                        <button
+                                          key={p}
+                                          type="button"
+                                          onClick={() => setNewTaskPriority(p)}
+                                          className={`py-1 px-1.5 rounded-lg text-[10px] font-mono font-semibold uppercase tracking-wider transition-all cursor-pointer capitalize ${
+                                            isSelected
+                                              ? p === 'urgent'
+                                                ? 'bg-rose-500/30 text-rose-200 border border-rose-400/50 shadow-[0_0_8px_rgba(244,63,94,0.4)]'
+                                                : p === 'high'
+                                                ? 'bg-amber-500/30 text-amber-200 border border-amber-400/50 shadow-[0_0_8px_rgba(251,191,36,0.4)]'
+                                                : p === 'low'
+                                                ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/50 shadow-[0_0_8px_rgba(52,211,153,0.4)]'
+                                                : 'bg-indigo-500/30 text-indigo-200 border border-indigo-400/50 shadow-[0_0_8px_rgba(129,140,248,0.4)]'
+                                              : 'bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 border border-white/5'
+                                          }`}
+                                        >
+                                          {p}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+
+                                {/* Deadline Picker with Quick Presets */}
+                                <div>
+                                  <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-400 mb-1.5 flex items-center justify-between">
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="w-3 h-3 text-indigo-300" /> Deadline Countdown
+                                    </span>
+                                    {newTaskDeadline && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setNewTaskDeadline('')}
+                                        className="text-[9px] text-zinc-500 hover:text-rose-300 cursor-pointer"
+                                      >
+                                        Clear
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const d = new Date(Date.now() + 60 * 60 * 1000);
+                                        const y = d.getFullYear();
+                                        const m = String(d.getMonth() + 1).padStart(2, '0');
+                                        const day = String(d.getDate()).padStart(2, '0');
+                                        const h = String(d.getHours()).padStart(2, '0');
+                                        const min = String(d.getMinutes()).padStart(2, '0');
+                                        setNewTaskDeadline(`${y}-${m}-${day}T${h}:${min}`);
+                                      }}
+                                      className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10 cursor-pointer"
+                                    >
+                                      +1 Hour
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const d = new Date(Date.now() + 3 * 60 * 60 * 1000);
+                                        const y = d.getFullYear();
+                                        const m = String(d.getMonth() + 1).padStart(2, '0');
+                                        const day = String(d.getDate()).padStart(2, '0');
+                                        const h = String(d.getHours()).padStart(2, '0');
+                                        const min = String(d.getMinutes()).padStart(2, '0');
+                                        setNewTaskDeadline(`${y}-${m}-${day}T${h}:${min}`);
+                                      }}
+                                      className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10 cursor-pointer"
+                                    >
+                                      +3 Hours
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const d = new Date();
+                                        const y = d.getFullYear();
+                                        const m = String(d.getMonth() + 1).padStart(2, '0');
+                                        const day = String(d.getDate()).padStart(2, '0');
+                                        setNewTaskDeadline(`${y}-${m}-${day}T18:00`);
+                                      }}
+                                      className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10 cursor-pointer"
+                                    >
+                                      EOD (18:00)
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const d = new Date();
+                                        const y = d.getFullYear();
+                                        const m = String(d.getMonth() + 1).padStart(2, '0');
+                                        const day = String(d.getDate()).padStart(2, '0');
+                                        setNewTaskDeadline(`${y}-${m}-${day}T22:00`);
+                                      }}
+                                      className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-white/5 hover:bg-white/10 text-zinc-300 border border-white/10 cursor-pointer"
+                                    >
+                                      Tonight (22:00)
+                                    </button>
+                                  </div>
+
+                                  <input
+                                    type="datetime-local"
+                                    value={newTaskDeadline}
+                                    onChange={(e) => setNewTaskDeadline(e.target.value)}
+                                    className="w-full bg-[#18112e]/70 border border-white/15 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-indigo-400"
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </form>
 
                           <div className="flex flex-col gap-2.5">
                             {filteredGoals.length === 0 ? (
                               <div className="py-7 text-center liquid-glass-subtle rounded-2xl border border-white/5">
                                 <p className="text-xs text-zinc-300 font-medium">No priority tasks today</p>
-                                <p className="text-[11px] text-zinc-400 mt-0.5">Use the input above to plan your focus must-dos.</p>
+                                <p className="text-[11px] text-zinc-400 mt-0.5">Use the input above to plan your focus must-dos with live timers.</p>
                               </div>
                             ) : (
                               filteredGoals.map((goal) => {
@@ -644,38 +820,63 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onOpenQuickAdd }) 
                                   <div
                                     key={goal.id}
                                     onClick={() => toggleDailyGoal(goal.id)}
-                                    className={`p-3 rounded-2xl liquid-glass-subtle flex items-start gap-2.5 cursor-pointer transition-all ${
-                                      !isCompleted ? 'hover:bg-white/[0.08]' : ''
+                                    className={`p-3 rounded-2xl liquid-glass-subtle flex items-start justify-between gap-2.5 cursor-pointer transition-all group ${
+                                      !isCompleted ? 'hover:bg-white/[0.08]' : 'opacity-80'
                                     }`}
                                   >
-                                    <div
-                                      className={`w-4 h-4 mt-0.5 rounded-md flex items-center justify-center shrink-0 transition-all ${
-                                        isCompleted
-                                          ? 'liquid-btn-primary text-white'
-                                          : 'border border-white/25 hover:border-white/50 bg-white/[0.03]'
-                                      }`}
-                                    >
-                                      {isCompleted && <Check className="w-2.5 h-2.5 stroke-[2.5]" />}
-                                    </div>
-
-                                    <div className="flex-1 min-w-0">
-                                      <span
-                                        className={`text-xs block ${
-                                          isCompleted ? 'text-zinc-400 line-through' : 'font-medium text-white'
+                                    <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                                      <div
+                                        className={`w-4 h-4 mt-0.5 rounded-md flex items-center justify-center shrink-0 transition-all ${
+                                          isCompleted
+                                            ? 'liquid-btn-primary text-white'
+                                            : 'border border-white/25 hover:border-white/50 bg-white/[0.03]'
                                         }`}
                                       >
-                                        {goal.title}
-                                      </span>
-                                      <div className="flex items-center gap-2 mt-0.5 text-[11px] font-mono">
-                                        <span className={isCompleted ? 'text-zinc-500' : 'text-zinc-300'}>
-                                          {goal.targetTime || '18:00'}
-                                        </span>
-                                        <span className={isCompleted ? 'text-zinc-500' : 'text-zinc-300'}>•</span>
-                                        <span className={isCompleted ? 'text-zinc-500' : goal.sharedWithPartner ? 'text-periwinkle font-medium' : 'text-zinc-400'}>
-                                          {goal.sharedWithPartner ? 'Shared' : 'Private'}
-                                        </span>
+                                        {isCompleted && <Check className="w-2.5 h-2.5 stroke-[2.5]" />}
+                                      </div>
+
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <PriorityBadge priority={goal.priority || 'medium'} />
+                                          <span
+                                            className={`text-xs ${
+                                              isCompleted ? 'text-zinc-400 line-through' : 'font-medium text-white'
+                                            }`}
+                                          >
+                                            {goal.title}
+                                          </span>
+                                        </div>
+
+                                        {/* Task Timer & Metadata */}
+                                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                          <TaskCountdownTimer
+                                            deadline={goal.deadline}
+                                            targetTime={goal.targetTime}
+                                            taskDate={goal.date}
+                                            completed={goal.completed}
+                                          />
+
+                                          {goal.sharedWithPartner && (
+                                            <span className="text-[10px] font-mono text-indigo-300 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-400/20">
+                                              Duo
+                                            </span>
+                                          )}
+                                        </div>
                                       </div>
                                     </div>
+
+                                    {/* Delete Task Button */}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        deleteDailyGoal(goal.id);
+                                      }}
+                                      className="p-1 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-500/10 transition opacity-0 group-hover:opacity-100 cursor-pointer shrink-0"
+                                      title="Delete task"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
                                   </div>
                                 );
                               })

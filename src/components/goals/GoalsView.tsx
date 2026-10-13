@@ -12,8 +12,9 @@ import {
   Check
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { Goal, GoalTargetType } from '../../types';
+import { Goal, GoalTargetType, TaskPriority } from '../../types';
 import { getTodayString, getDateOffsetString } from '../../services/storage';
+import { TaskCountdownTimer, PriorityBadge } from '../ui/TaskCountdownTimer';
 
 export const GoalsView: React.FC = () => {
   const {
@@ -39,6 +40,8 @@ export const GoalsView: React.FC = () => {
   const [dailyGoalTitle, setDailyGoalTitle] = useState('');
   const [dailyGoalShared, setDailyGoalShared] = useState(true);
   const [dailyGoalTime, setDailyGoalTime] = useState('19:00');
+  const [dailyGoalPriority, setDailyGoalPriority] = useState<TaskPriority>('high');
+  const [dailyGoalDeadline, setDailyGoalDeadline] = useState('');
 
   // Long-term goal creation form state
   const [goalTitle, setGoalTitle] = useState('');
@@ -53,8 +56,16 @@ export const GoalsView: React.FC = () => {
   const handleCreateDailyGoal = (e: React.FormEvent) => {
     e.preventDefault();
     if (!dailyGoalTitle.trim()) return;
-    addDailyGoal(dailyGoalTitle.trim(), dailyGoalShared, dailyGoalTime || undefined);
+    const computedDeadline = dailyGoalDeadline || (dailyGoalTime ? `${getTodayString()}T${dailyGoalTime}` : undefined);
+    addDailyGoal(
+      dailyGoalTitle.trim(),
+      dailyGoalShared,
+      dailyGoalTime || undefined,
+      dailyGoalPriority,
+      computedDeadline
+    );
     setDailyGoalTitle('');
+    setDailyGoalDeadline('');
   };
 
   const handleCreateLongTermGoal = (e: React.FormEvent) => {
@@ -161,44 +172,88 @@ export const GoalsView: React.FC = () => {
               Collaborator mode synchronizes progress with your accountability partner in real-time.
             </p>
 
-            <form onSubmit={handleCreateDailyGoal} className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-              <input
-                type="text"
-                required
-                value={dailyGoalTitle}
-                onChange={(e) => setDailyGoalTitle(e.target.value)}
-                placeholder="What is your non-negotiable target today?"
-                className="sm:col-span-6 liquid-glass-subtle rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-400 focus:outline-none focus:border-white/30"
-              />
-
-              <div className="sm:col-span-3 flex items-center gap-2">
+            <form onSubmit={handleCreateDailyGoal} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                 <input
-                  type="time"
-                  value={dailyGoalTime}
-                  onChange={(e) => setDailyGoalTime(e.target.value)}
-                  className="w-full liquid-glass-subtle rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-white/30"
-                  title="Target completion time"
+                  type="text"
+                  required
+                  value={dailyGoalTitle}
+                  onChange={(e) => setDailyGoalTitle(e.target.value)}
+                  placeholder="What is your non-negotiable target today?"
+                  className="sm:col-span-8 liquid-glass-subtle rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-400 focus:outline-none focus:border-indigo-400/50"
                 />
+
+                <div className="sm:col-span-4 flex items-center justify-between sm:justify-end gap-3">
+                  <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={dailyGoalShared}
+                      onChange={(e) => setDailyGoalShared(e.target.checked)}
+                      className="w-4 h-4 rounded text-indigo-500 accent-indigo-500 cursor-pointer"
+                    />
+                    <span>Share with Partner</span>
+                  </label>
+
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl liquid-btn-primary text-white font-medium text-xs tracking-wide flex items-center gap-1 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Add Task</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="sm:col-span-3 flex items-center justify-between sm:justify-end gap-3">
-                <label className="flex items-center gap-2 text-xs text-zinc-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={dailyGoalShared}
-                    onChange={(e) => setDailyGoalShared(e.target.checked)}
-                    className="w-4 h-4 rounded text-indigo-500 accent-indigo-500 cursor-pointer"
-                  />
-                  <span>Share</span>
-                </label>
+              {/* Priority & Deadline Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 pt-1 border-t border-white/5">
+                {/* Priority Selector */}
+                <div className="sm:col-span-7 flex items-center gap-2">
+                  <span className="text-[11px] font-mono text-zinc-400 uppercase">Priority:</span>
+                  <div className="flex items-center gap-1.5 flex-1">
+                    {(['urgent', 'high', 'medium', 'low'] as TaskPriority[]).map((p) => {
+                      const isSelected = dailyGoalPriority === p;
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setDailyGoalPriority(p)}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-mono font-semibold uppercase tracking-wider capitalize transition-all cursor-pointer ${
+                            isSelected
+                              ? p === 'urgent'
+                                ? 'bg-rose-500/30 text-rose-200 border border-rose-400/50'
+                                : p === 'high'
+                                ? 'bg-amber-500/30 text-amber-200 border border-amber-400/50'
+                                : p === 'low'
+                                ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/50'
+                                : 'bg-indigo-500/30 text-indigo-200 border border-indigo-400/50'
+                              : 'bg-white/5 text-zinc-400 hover:text-white border border-white/5'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl liquid-btn-primary text-white font-medium text-xs tracking-wide flex items-center gap-1 cursor-pointer"
-                >
-                  <Plus className="w-4 h-4" />
-                  <span>Add</span>
-                </button>
+                {/* Target Time / Deadline */}
+                <div className="sm:col-span-5 flex items-center gap-2">
+                  <span className="text-[11px] font-mono text-zinc-400 uppercase flex items-center gap-1">
+                    <Clock className="w-3 h-3 text-indigo-300" /> Deadline:
+                  </span>
+                  <input
+                    type="time"
+                    value={dailyGoalTime}
+                    onChange={(e) => {
+                      setDailyGoalTime(e.target.value);
+                      if (e.target.value) {
+                        setDailyGoalDeadline(`${getTodayString()}T${e.target.value}`);
+                      }
+                    }}
+                    className="flex-1 liquid-glass-subtle rounded-xl px-2.5 py-1 text-xs text-white focus:outline-none focus:border-indigo-400/50 font-mono"
+                    title="Target completion time"
+                  />
+                </div>
               </div>
             </form>
           </div>
@@ -209,7 +264,7 @@ export const GoalsView: React.FC = () => {
               <div className="text-center py-12 liquid-glass rounded-3xl p-8 border border-white/10">
                 <Target className="w-10 h-10 text-indigo-300 mx-auto mb-2 opacity-60" />
                 <h4 className="text-sm font-bold text-white">No daily goals yet</h4>
-                <p className="text-xs text-zinc-400 mt-1">Set 2 to 4 key tasks to tackle today.</p>
+                <p className="text-xs text-zinc-400 mt-1">Set priority tasks with live deadline countdown timers today.</p>
               </div>
             ) : (
               dailyGoals.map((dg) => (
@@ -232,19 +287,24 @@ export const GoalsView: React.FC = () => {
                       {dg.completed && <Check className="w-3.5 h-3.5 stroke-[2.5]" />}
                     </button>
                     <div className="min-w-0">
-                      <div
-                        className={`text-sm font-semibold truncate ${
-                          dg.completed ? 'text-zinc-400 line-through' : 'text-white'
-                        }`}
-                      >
-                        {dg.title}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <PriorityBadge priority={dg.priority || 'medium'} />
+                        <span
+                          className={`text-sm font-semibold truncate ${
+                            dg.completed ? 'text-zinc-400 line-through' : 'text-white'
+                          }`}
+                        >
+                          {dg.title}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-zinc-400 font-mono mt-0.5">
-                        {dg.targetTime && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3 text-indigo-300" /> Target: {dg.targetTime}
-                          </span>
-                        )}
+                      <div className="flex items-center gap-2.5 text-xs text-zinc-400 font-mono mt-1 flex-wrap">
+                        <TaskCountdownTimer
+                          deadline={dg.deadline}
+                          targetTime={dg.targetTime}
+                          taskDate={dg.date}
+                          completed={dg.completed}
+                        />
+
                         {dg.completedAt && (
                           <span className="text-emerald-300 font-medium">
                             Done at {new Date(dg.completedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -267,10 +327,12 @@ export const GoalsView: React.FC = () => {
                       <Users2 className="w-3 h-3" />
                       <span className="hidden sm:inline">{dg.sharedWithPartner ? 'Shared' : 'Private'}</span>
                     </button>
+
                     <button
+                      type="button"
                       onClick={() => deleteDailyGoal(dg.id)}
-                      className="p-1.5 rounded-xl liquid-glass-subtle text-zinc-400 hover:text-rose-400 transition cursor-pointer"
-                      title="Delete"
+                      className="p-1.5 rounded-xl liquid-glass-subtle hover:bg-rose-500/15 text-zinc-400 hover:text-rose-300 transition cursor-pointer"
+                      title="Delete task"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

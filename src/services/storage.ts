@@ -83,14 +83,14 @@ export const INITIAL_GOALS: Goal[] = [];
 export const INITIAL_DAILY_GOALS: DailyGoalItem[] = [];
 
 export const INITIAL_BUDGETS: CategoryBudget[] = [
-  { category: 'Food & Dining', monthlyLimit: 500 },
-  { category: 'Housing & Utilities', monthlyLimit: 1200 },
-  { category: 'Transportation', monthlyLimit: 200 },
-  { category: 'Shopping & Groceries', monthlyLimit: 400 },
-  { category: 'Health & Fitness', monthlyLimit: 150 },
-  { category: 'Entertainment', monthlyLimit: 120 },
-  { category: 'Education & Learning', monthlyLimit: 100 },
-  { category: 'Others', monthlyLimit: 200 }
+  { category: 'Food & Dining', monthlyLimit: 0 },
+  { category: 'Housing & Utilities', monthlyLimit: 0 },
+  { category: 'Transportation', monthlyLimit: 0 },
+  { category: 'Shopping & Groceries', monthlyLimit: 0 },
+  { category: 'Health & Fitness', monthlyLimit: 0 },
+  { category: 'Entertainment', monthlyLimit: 0 },
+  { category: 'Education & Learning', monthlyLimit: 0 },
+  { category: 'Others', monthlyLimit: 0 }
 ];
 
 export const INITIAL_EXPENSES: Expense[] = [];
@@ -141,7 +141,7 @@ export const INITIAL_NOTIFICATIONS: AppNotification[] = [];
 export const INITIAL_COOP_QUESTS: CoopQuest[] = [];
 
 export const INITIAL_STREAK_FREEZE: StreakFreezeInfo = {
-  availableFreezes: 1,
+  availableFreezes: 0,
   freezesUsedThisMonth: 0,
   partnerGiftedCount: 0,
   isShieldActiveToday: false
@@ -435,7 +435,23 @@ export class LocalStorageService {
   }
 
   static clearAll(): void {
-    localStorage.clear();
+    try {
+      Object.values(STORAGE_KEYS).forEach(k => {
+        localStorage.removeItem(k);
+      });
+      localStorage.setItem(STORAGE_KEYS.HABITS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.HABIT_LOGS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.DAILY_GOALS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.BUDGETS, JSON.stringify(INITIAL_BUDGETS));
+      localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.COOP_QUESTS, JSON.stringify([]));
+      localStorage.setItem(STORAGE_KEYS.STREAK_FREEZE, JSON.stringify(INITIAL_STREAK_FREEZE));
+      localStorage.setItem(STORAGE_KEYS.SUBSCRIPTIONS, JSON.stringify([]));
+    } catch (e) {
+      console.error('Error clearing storage:', e);
+    }
   }
 
   static loadSampleData(): void {

@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { getTodayString } from '../../services/storage';
-import { ExpenseCategory, PaymentMethod } from '../../types';
+import { ExpenseCategory, PaymentMethod, TaskPriority } from '../../types';
 
 interface QuickAddModalProps {
   isOpen: boolean;
@@ -33,6 +33,8 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose })
   const [goalTitle, setGoalTitle] = useState('');
   const [goalShared, setGoalShared] = useState(true);
   const [goalTime, setGoalTime] = useState('18:00');
+  const [goalPriority, setGoalPriority] = useState<TaskPriority>('medium');
+  const [goalDeadline, setGoalDeadline] = useState('');
 
   // Expense fields
   const [amount, setAmount] = useState('');
@@ -45,8 +47,16 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose })
   const handleDailyGoalSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!goalTitle.trim()) return;
-    addDailyGoal(goalTitle.trim(), goalShared, goalTime || undefined);
+    addDailyGoal(
+      goalTitle.trim(),
+      goalShared,
+      goalTime || undefined,
+      goalPriority,
+      goalDeadline || undefined
+    );
     setGoalTitle('');
+    setGoalDeadline('');
+    setGoalPriority('medium');
     onClose();
   };
 
@@ -69,6 +79,24 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose })
     setAmount('');
     setNote('');
     onClose();
+  };
+
+  const applyPresetDeadline = (minutes: number) => {
+    const target = new Date(Date.now() + minutes * 60 * 1000);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const str = `${target.getFullYear()}-${pad(target.getMonth() + 1)}-${pad(target.getDate())}T${pad(target.getHours())}:${pad(target.getMinutes())}`;
+    setGoalDeadline(str);
+  };
+
+  const applyTimeToday = (hours: number, minutes: number = 0) => {
+    const d = new Date();
+    d.setHours(hours, minutes, 0, 0);
+    if (d.getTime() < Date.now()) {
+      d.setDate(d.getDate() + 1);
+    }
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const str = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    setGoalDeadline(str);
   };
 
   return (
@@ -146,12 +174,86 @@ export const QuickAddModal: React.FC<QuickAddModalProps> = ({ isOpen, onClose })
               />
             </div>
 
+            {/* Priority Selection */}
             <div>
-              <label className="block text-xs font-semibold text-zinc-300 mb-1">Target Time (optional)</label>
+              <label className="block text-xs font-semibold text-zinc-300 mb-1.5">Priority Level</label>
+              <div className="grid grid-cols-4 gap-1.5">
+                {(['urgent', 'high', 'medium', 'low'] as TaskPriority[]).map((p) => {
+                  const isSelected = goalPriority === p;
+                  const colors = {
+                    urgent: isSelected ? 'bg-rose-500/25 text-rose-300 border-rose-500/50 shadow-sm' : 'text-zinc-400 hover:text-rose-300',
+                    high: isSelected ? 'bg-amber-500/25 text-amber-300 border-amber-500/50 shadow-sm' : 'text-zinc-400 hover:text-amber-300',
+                    medium: isSelected ? 'bg-indigo-500/25 text-indigo-300 border-indigo-500/50 shadow-sm' : 'text-zinc-400 hover:text-indigo-300',
+                    low: isSelected ? 'bg-zinc-500/25 text-zinc-300 border-zinc-500/50 shadow-sm' : 'text-zinc-400 hover:text-zinc-300'
+                  }[p];
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setGoalPriority(p)}
+                      className={`py-1.5 px-2 rounded-xl text-[11px] font-semibold capitalize border border-white/10 transition cursor-pointer ${colors}`}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Deadline Countdown & Timer */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-semibold text-zinc-300 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Deadline Countdown Timer</span>
+                </label>
+                {goalDeadline && (
+                  <button
+                    type="button"
+                    onClick={() => setGoalDeadline('')}
+                    className="text-[10px] text-zinc-400 hover:text-white cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {/* Quick Presets */}
+              <div className="flex items-center gap-1.5 mb-2 overflow-x-auto pb-1 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => applyPresetDeadline(60)}
+                  className="px-2 py-1 rounded-lg liquid-glass-subtle hover:bg-white/10 text-zinc-300 cursor-pointer whitespace-nowrap"
+                >
+                  +1h
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyPresetDeadline(180)}
+                  className="px-2 py-1 rounded-lg liquid-glass-subtle hover:bg-white/10 text-zinc-300 cursor-pointer whitespace-nowrap"
+                >
+                  +3h
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyTimeToday(18, 0)}
+                  className="px-2 py-1 rounded-lg liquid-glass-subtle hover:bg-white/10 text-zinc-300 cursor-pointer whitespace-nowrap"
+                >
+                  18:00 EOD
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyTimeToday(22, 0)}
+                  className="px-2 py-1 rounded-lg liquid-glass-subtle hover:bg-white/10 text-zinc-300 cursor-pointer whitespace-nowrap"
+                >
+                  Tonight 22:00
+                </button>
+              </div>
+
               <input
-                type="time"
-                value={goalTime}
-                onChange={(e) => setGoalTime(e.target.value)}
+                type="datetime-local"
+                value={goalDeadline}
+                onChange={(e) => setGoalDeadline(e.target.value)}
                 className="w-full liquid-glass-subtle rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-white/30"
               />
             </div>

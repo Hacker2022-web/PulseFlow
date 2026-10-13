@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   LayoutDashboard,
   CheckCircle2,
@@ -8,7 +7,8 @@ import {
   Settings,
   Flame,
   Zap,
-  LogIn
+  LogIn,
+  LogOut
 } from 'lucide-react';
 import { useApp, NavigationTab } from '../../context/AppContext';
 
@@ -19,23 +19,29 @@ export const Sidebar: React.FC = () => {
     collaboratorPair,
     habits,
     getHabitStreak,
-    user
+    user,
+    signOut
   } = useApp();
 
-  const totalStreaks = habits
-    .filter(h => h.status === 'active')
-    .reduce((acc, h) => acc + getHabitStreak(h.id).current, 0);
+  const isAuthenticated = Boolean(user.email);
 
-  const activeHabitsCount = habits.filter(h => h.status === 'active').length;
+  const activeHabitsList = habits.filter(h => h.status === 'active');
+  const totalStreaks = activeHabitsList.length > 0
+    ? Math.max(...activeHabitsList.map(h => getHabitStreak(h.id).current), 0)
+    : 0;
 
-  const userInitials = user.displayName
+  const activeHabitsCount = activeHabitsList.length;
+
+  const userInitials = user.displayName && user.displayName !== 'My Account'
     ? user.displayName
         .split(' ')
         .map(n => n[0])
         .join('')
         .slice(0, 2)
         .toUpperCase()
-    : 'JM';
+    : user.email
+    ? user.email.slice(0, 2).toUpperCase()
+    : 'PF';
 
   return (
     <aside
@@ -74,12 +80,16 @@ export const Sidebar: React.FC = () => {
             <div>
               <div className="text-[10px] uppercase font-mono font-semibold tracking-wider text-zinc-400">Streak</div>
               <div className="text-sm font-semibold text-white tracking-tight">
-                {totalStreaks > 0 ? `${totalStreaks} Days Active` : '57 Days Active'}
+                {totalStreaks > 0 ? `${totalStreaks} ${totalStreaks === 1 ? 'Day' : 'Days'} Active` : '0 Days Active'}
               </div>
             </div>
           </div>
-          <span className="text-[11px] font-mono text-emerald-300 bg-emerald-500/15 border border-emerald-400/30 px-2 py-0.5 rounded-full shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]">
-            Steady
+          <span className={`text-[11px] font-mono px-2 py-0.5 rounded-full shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)] ${
+            totalStreaks > 0
+              ? 'text-emerald-300 bg-emerald-500/15 border border-emerald-400/30'
+              : 'text-zinc-400 bg-white/5 border border-white/10'
+          }`}>
+            {totalStreaks > 0 ? 'Steady' : '0d'}
           </span>
         </div>
 
@@ -197,20 +207,36 @@ export const Sidebar: React.FC = () => {
             )}
           </button>
 
-          {/* Sign In / Sign Up */}
-          <button
-            onClick={() => setActiveTab('auth')}
-            className={`flex items-center justify-between px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
-              activeTab === 'auth'
-                ? 'liquid-glass-pill text-white font-medium'
-                : 'text-zinc-400 hover:text-white hover:bg-white/[0.05]'
-            }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <LogIn className="w-4 h-4 text-zinc-500" />
-              <span className="text-xs">Sign In / Switch</span>
-            </div>
-          </button>
+          {/* Sign Out or Sign In */}
+          {isAuthenticated ? (
+            <button
+              onClick={signOut}
+              className="flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all cursor-pointer text-rose-300 hover:text-white hover:bg-rose-500/20 border border-rose-500/25 hover:border-rose-400/40 group mt-1"
+              title="Sign out of your account"
+            >
+              <div className="flex items-center gap-2.5">
+                <LogOut className="w-4 h-4 text-rose-400 group-hover:text-rose-300 transition-colors" />
+                <span className="text-xs font-semibold">Sign Out</span>
+              </div>
+              <span className="text-[10px] font-mono text-rose-300/80 bg-rose-500/15 px-1.5 py-0.5 rounded-md">
+                Exit
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={() => setActiveTab('auth')}
+              className={`flex items-center justify-between px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
+                activeTab === 'auth'
+                  ? 'liquid-glass-pill text-white font-medium'
+                  : 'text-zinc-400 hover:text-white hover:bg-white/[0.05]'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <LogIn className="w-4 h-4 text-indigo-400" />
+                <span className="text-xs font-medium">Sign In</span>
+              </div>
+            </button>
+          )}
         </nav>
       </div>
 
@@ -220,12 +246,16 @@ export const Sidebar: React.FC = () => {
           onClick={() => setActiveTab('settings')}
           className="flex items-center gap-3 p-2 rounded-2xl liquid-glass-subtle hover:bg-white/[0.08] transition-all cursor-pointer"
         >
-          <div className="w-9 h-9 rounded-xl liquid-glass-pill flex items-center justify-center font-bold text-indigo-200 text-xs shadow-inner">
-            {userInitials}
-          </div>
+          {user.photoURL ? (
+            <img src={user.photoURL} alt={user.displayName} className="w-9 h-9 rounded-xl object-cover border border-white/20 shadow-inner" />
+          ) : (
+            <div className="w-9 h-9 rounded-xl liquid-glass-pill flex items-center justify-center font-bold text-indigo-200 text-xs shadow-inner">
+              {userInitials}
+            </div>
+          )}
           <div className="overflow-hidden">
-            <div className="text-sm font-semibold text-white truncate">{user.displayName || 'Your Profile'}</div>
-            <div className="text-[11px] text-zinc-400 font-mono truncate">Pro Plan</div>
+            <div className="text-sm font-semibold text-white truncate">{user.displayName || 'My Account'}</div>
+            <div className="text-[11px] text-zinc-400 font-mono truncate">{user.email || 'Guest Mode'}</div>
           </div>
         </div>
       </div>

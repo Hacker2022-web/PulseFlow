@@ -75,6 +75,8 @@ export interface Goal {
   createdAt: string;
 }
 
+export type TaskPriority = 'urgent' | 'high' | 'medium' | 'low';
+
 export interface DailyGoalItem {
   id: string;
   userId: string;
@@ -84,6 +86,8 @@ export interface DailyGoalItem {
   completedAt?: string;
   sharedWithPartner: boolean;
   targetTime?: string; // e.g., "20:00" for reminder
+  priority?: TaskPriority;
+  deadline?: string; // e.g., "2026-10-13T18:00" or "18:00" for live deadline countdown timer
   nudgedToday?: boolean;
 }
 
@@ -243,7 +247,7 @@ export interface BentoTileConfig {
 export interface WeeklyAiDebrief {
   weekRange: string;
   score: number;
-  grade: 'A+' | 'A' | 'B+' | 'B' | 'C';
+  grade: 'A+' | 'A' | 'B+' | 'B' | 'C' | '--';
   headline: string;
   summary: string;
   wins: string[];

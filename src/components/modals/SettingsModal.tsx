@@ -8,12 +8,12 @@ import {
   Download,
   Trash2,
   Database,
-  CloudCheck,
   ShieldAlert,
   Save,
   Check,
   Sparkles,
-  Key
+  Key,
+  LogOut
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { CurrencyCode } from '../../types';
@@ -27,7 +27,8 @@ export const SettingsModal: React.FC = () => {
     resetAllDataToDefault,
     loadSampleDemoData,
     triggerSyncNow,
-    syncStatus
+    syncStatus,
+    signOut
   } = useApp();
 
   const [displayName, setDisplayName] = useState(user.displayName);
@@ -145,8 +146,24 @@ export const SettingsModal: React.FC = () => {
                   className="w-full max-w-md liquid-glass-subtle rounded-xl px-3.5 py-2 text-xs text-white focus:outline-none focus:border-white/30"
                 />
               </div>
-              <div className="text-xs font-mono text-zinc-400">
-                Email: {user.email} (Connected via Google Auth)
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <div className="text-xs font-mono text-zinc-400">
+                  Email: {user.email || 'guest@pulseflow.app'}
+                </div>
+                {user.email && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (window.confirm('Are you sure you want to sign out of this account?')) {
+                        await signOut();
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-medium text-xs border border-rose-500/30 transition cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Sign Out</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -370,6 +387,21 @@ export const SettingsModal: React.FC = () => {
             <Sparkles className="w-4 h-4 text-indigo-300" />
             <span>Load Sample Demo Data</span>
           </button>
+
+          {user.email && (
+            <button
+              type="button"
+              onClick={async () => {
+                if (window.confirm('Sign out and end your active session?')) {
+                  await signOut();
+                }
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 font-medium text-xs border border-rose-500/30 transition cursor-pointer"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out of Account</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

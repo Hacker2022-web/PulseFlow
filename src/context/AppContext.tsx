@@ -18,7 +18,8 @@ import {
   SubscriptionItem,
   BentoTileId,
   BentoTileConfig,
-  WeeklyAiDebrief
+  WeeklyAiDebrief,
+  TaskPriority
 } from '../types';
 import {
   LocalStorageService,
@@ -77,7 +78,7 @@ interface AppContextType {
   deleteGoal: (goalId: string) => void;
   logGoalProgress: (goalId: string, value: number, note?: string) => void;
   toggleMilestone: (goalId: string, milestoneId: string) => void;
-  addDailyGoal: (title: string, shared: boolean, targetTime?: string) => void;
+  addDailyGoal: (title: string, shared: boolean, targetTime?: string, priority?: TaskPriority, deadline?: string) => void;
   toggleDailyGoal: (dailyGoalId: string) => void;
   deleteDailyGoal: (dailyGoalId: string) => void;
 
@@ -149,6 +150,7 @@ interface AppContextType {
   triggerSyncNow: () => void;
   resetAllDataToDefault: () => void;
   loadSampleDemoData: () => void;
+  signOut: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -322,19 +324,67 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => unsub();
   }, []);
 
-  // Auto-clean any stale demo data from previous test sessions
+  // Auto-clean any stale demo data from previous test sessions or cached localStorage
   useEffect(() => {
-    if (collaboratorPair?.id === 'pair_demo_99' || collaboratorPair?.userBName === 'Alex Rivera') {
+    const rawHabits = LocalStorageService.getItem<Habit[]>(STORAGE_KEYS.HABITS, []);
+    const rawGoals = LocalStorageService.getItem<Goal[]>(STORAGE_KEYS.GOALS, []);
+    const rawExpenses = LocalStorageService.getItem<Expense[]>(STORAGE_KEYS.EXPENSES, []);
+    const rawDailyGoals = LocalStorageService.getItem<DailyGoalItem[]>(STORAGE_KEYS.DAILY_GOALS, []);
+    const rawQuests = LocalStorageService.getItem<CoopQuest[]>(STORAGE_KEYS.COOP_QUESTS, []);
+    const rawSubs = LocalStorageService.getItem<SubscriptionItem[]>(STORAGE_KEYS.SUBSCRIPTIONS, []);
+    const rawBudgets = LocalStorageService.getItem<CategoryBudget[]>(STORAGE_KEYS.BUDGETS, []);
+
+    const budgetsTotal = Array.isArray(rawBudgets) ? rawBudgets.reduce((s, b) => s + (b.monthlyLimit || 0), 0) : 0;
+    const hasOldDemoBudgets = budgetsTotal === 2870; // 500+1200+200+400+150+120+100+200
+
+    const hasDemoData =
+      hasOldDemoBudgets ||
+      rawHabits.some(h => h.userId === 'demo_user_001' || h.id === 'h1' || h.id === 'h2' || h.id === 'h3' || h.name.includes('Morning Hydration') || h.name.includes('Deep Focus')) ||
+      rawGoals.some(g => g.userId === 'demo_user_001' || g.id === 'g1' || g.title.includes('Run 100')) ||
+      rawExpenses.some(e => e.userId === 'demo_user_001' || e.id === 'e1' || e.id === 'e2' || (e.note && e.note.includes('Team lunch'))) ||
+      rawDailyGoals.some(d => d.userId === 'demo_user_001' || d.id === 'dg1' || d.id === 'dg2') ||
+      rawQuests.some(q => q.id === 'cq1') ||
+      rawSubs.some(s => s.id === 'sub_1' || (s.name && s.name.includes('Spotify Family'))) ||
+      collaboratorPair?.id === 'pair_demo_99' ||
+      collaboratorPair?.userBName === 'Alex Rivera' ||
+      user.displayName === 'Alex Rivera' ||
+      user.displayName === 'Jordan Miller';
+
+    if (hasDemoData) {
+      console.log('PulseFlow: Detected stale demo/sample data. Purging to clean zero slate...');
+      setHabits([]);
+      setHabitLogs([]);
+      setGoals([]);
+      setDailyGoals([]);
+      setExpenses([]);
+      setBudgets(INITIAL_BUDGETS);
       setCollaboratorPair(null);
+      setPartnerData(INITIAL_PARTNER_DATA);
+      setNotifications([]);
+      setCoopQuests([]);
+      setStreakFreeze(INITIAL_STREAK_FREEZE);
+      setSubscriptions([]);
+
+      LocalStorageService.setItem(STORAGE_KEYS.HABITS, []);
+      LocalStorageService.setItem(STORAGE_KEYS.HABIT_LOGS, []);
+      LocalStorageService.setItem(STORAGE_KEYS.GOALS, []);
+      LocalStorageService.setItem(STORAGE_KEYS.DAILY_GOALS, []);
+      LocalStorageService.setItem(STORAGE_KEYS.EXPENSES, []);
+      LocalStorageService.setItem(STORAGE_KEYS.BUDGETS, INITIAL_BUDGETS);
       LocalStorageService.removeItem(STORAGE_KEYS.PAIR);
       LocalStorageService.removeItem(STORAGE_KEYS.PARTNER_ITEMS);
-    }
-    if (user.displayName === 'Alex Rivera' || user.displayName === 'Jordan Miller' || user.photoURL?.includes('unsplash')) {
-      setUser(prev => ({
-        ...prev,
-        displayName: prev.displayName === 'Alex Rivera' || prev.displayName === 'Jordan Miller' ? 'My Account' : prev.displayName,
-        photoURL: prev.photoURL?.includes('unsplash') ? '' : prev.photoURL
-      }));
+      LocalStorageService.setItem(STORAGE_KEYS.NOTIFICATIONS, []);
+      LocalStorageService.setItem(STORAGE_KEYS.COOP_QUESTS, []);
+      LocalStorageService.setItem(STORAGE_KEYS.STREAK_FREEZE, INITIAL_STREAK_FREEZE);
+      LocalStorageService.setItem(STORAGE_KEYS.SUBSCRIPTIONS, []);
+
+      if (user.displayName === 'Alex Rivera' || user.displayName === 'Jordan Miller' || user.photoURL?.includes('unsplash')) {
+        setUser(prev => ({
+          ...prev,
+          displayName: 'My Account',
+          photoURL: ''
+        }));
+      }
     }
   }, []);
 
@@ -527,7 +577,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     while (true) {
-      const dateStr = checkDate.toISOString().split('T')[0];
+      const year = checkDate.getFullYear();
+      const month = String(checkDate.getMonth() + 1).padStart(2, '0');
+      const day = String(checkDate.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       const log = habitLogsList.find(l => l.date === dateStr);
       if (log && log.completed) {
         currentStreak++;
@@ -710,7 +763,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // Daily Goals
-  const addDailyGoal = useCallback((title: string, shared: boolean, targetTime?: string) => {
+  const addDailyGoal = useCallback((
+    title: string,
+    shared: boolean,
+    targetTime?: string,
+    priority: TaskPriority = 'medium',
+    deadline?: string
+  ) => {
     const item: DailyGoalItem = {
       id: `dg_${Date.now()}`,
       userId: user.uid,
@@ -718,7 +777,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       title,
       completed: false,
       sharedWithPartner: shared,
-      targetTime
+      targetTime: targetTime || (deadline && deadline.includes('T') ? deadline.split('T')[1]?.slice(0, 5) : undefined),
+      priority,
+      deadline
     };
     setDailyGoals(prev => [item, ...prev]);
   }, [user.uid]);
@@ -1196,16 +1257,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }).length;
     const habitRateToday = habits.length > 0 ? Math.round((habitsCompletedToday / habits.length) * 100) : 100;
 
-    const score = habits.length === 0
-      ? 90
+    const isCleanSlate = habits.length === 0 && dailyGoals.length === 0;
+    const score = isCleanSlate
+      ? 0
       : Math.min(100, Math.round(habitRateToday * 0.45 + (forecast.budgetSafe ? 45 : 30) + (collaboratorPair ? 10 : 5)));
     
-    let grade: 'A+' | 'A' | 'B+' | 'B' | 'C' = 'B+';
-    if (score >= 95) grade = 'A+';
-    else if (score >= 88) grade = 'A';
-    else if (score >= 78) grade = 'B+';
-    else if (score >= 68) grade = 'B';
-    else grade = 'C';
+    let grade: 'A+' | 'A' | 'B+' | 'B' | 'C' | '--' = isCleanSlate ? '--' : 'B+';
+    if (!isCleanSlate) {
+      if (score >= 95) grade = 'A+';
+      else if (score >= 88) grade = 'A';
+      else if (score >= 78) grade = 'B+';
+      else if (score >= 68) grade = 'B';
+      else grade = 'C';
+    }
 
     const weekStart = getDateOffsetString(-6);
     const weekEnd = getTodayString();
@@ -1218,19 +1282,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           streakFreeze.availableFreezes > 0 ? `${streakFreeze.availableFreezes} streak freeze shield banked and ready.` : 'Streak protection active.'
         ]
       : [
-          'Welcome to PulseFlow OS! Clean slate ready for routines.',
-          'Budget and category tracking configured.',
-          'Accountability hub ready for duo pairing.'
+          'Clean slate initialized: 0 active habits and 0 expenses logged.',
+          'Ready for your personal daily routine configuration.',
+          'Duo accountability hub ready for optional pairing.'
         ];
 
-    const frictionList = [
-      forecast.budgetSafe
-        ? 'Expense burn rate is calibrated within safe margins.'
-        : `Current spending pace projects monthly limit reach on ${forecast.projectedExhaustionDate}.`,
-      habits.length === 0 ? 'Add your first 3 daily habits to build routine momentum.' : 'Remember to complete evening habits before quiet hours.'
-    ];
+    const frictionList = isCleanSlate
+      ? [
+          'No habits or expenses recorded yet for this weekly cycle.',
+          'Add your first habit using the Quick Log button to activate AI performance tracking.'
+        ]
+      : [
+          forecast.budgetSafe
+            ? 'Expense burn rate is calibrated within safe margins.'
+            : `Current spending pace projects monthly limit reach on ${forecast.projectedExhaustionDate}.`,
+          habits.length === 0 ? 'Add your first 3 daily habits to build routine momentum.' : 'Remember to complete evening habits before quiet hours.'
+        ];
 
-    const correlationsList = collaboratorPair
+    const correlationsList = isCleanSlate
+      ? [
+          {
+            insight: 'System Ready',
+            impact: 'Real-time sync and tracking active. Ready for your data.'
+          },
+          {
+            insight: 'Habit Synergy',
+            impact: 'Habit streaks unlock after your first 3 days of check-ins.'
+          }
+        ]
+      : collaboratorPair
       ? [
           {
             insight: 'Duo Synergy → Habit Retention',
@@ -1256,10 +1336,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       weekRange: `${weekStart} – ${weekEnd}`,
       score,
       grade,
-      headline: score >= 90
+      headline: isCleanSlate
+        ? 'Clean Slate: Log daily habits & expenses to generate your weekly AI debrief.'
+        : score >= 90
         ? 'High Velocity Flow State: Peak Consistency & Joint Synergy'
         : 'Steady Momentum with Actionable Budget Calibrations',
-      summary: collaboratorPair
+      summary: isCleanSlate
+        ? 'Welcome to PulseFlow. Your clean slate is initialized at zero. Start by adding your first habit or logging a transaction.'
+        : collaboratorPair
         ? `You maintained a strong ${habitRateToday}% routine compliance this week. Your collaboration with ${partnerName} is keeping your goals aligned.`
         : `You are in full control of your daily dashboard. Log habits and priority tasks daily to establish momentum.`,
       wins: winsList,
@@ -1315,6 +1399,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setStreakFreeze(SAMPLE_DEMO_DATA.streakFreeze);
     setSubscriptions(SAMPLE_DEMO_DATA.subscriptions);
     setBentoTiles(INITIAL_BENTO_TILES);
+  }, []);
+
+  // Sign Out: Disconnect Firebase session, clear local memory and storage, and redirect to Auth
+  const signOut = useCallback(async () => {
+    try {
+      if (firebaseService.isConfigured) {
+        await firebaseService.signOut();
+      }
+    } catch (err) {
+      console.error('Firebase sign out error:', err);
+    }
+
+    const freshUser: UserProfile = {
+      ...INITIAL_USER,
+      uid: 'user_pulse_' + Math.random().toString(36).substring(2, 9),
+      displayName: 'My Account',
+      email: '',
+      photoURL: ''
+    };
+    setUser(freshUser);
+
+    setHabits([]);
+    setHabitLogs([]);
+    setGoals([]);
+    setDailyGoals([]);
+    setExpenses([]);
+    setBudgets(INITIAL_BUDGETS);
+    setCollaboratorPair(null);
+    setPartnerData(INITIAL_PARTNER_DATA);
+    setNotifications([]);
+    setCoopQuests([]);
+    setStreakFreeze(INITIAL_STREAK_FREEZE);
+    setSubscriptions([]);
+    setBentoTiles(INITIAL_BENTO_TILES);
+
+    LocalStorageService.clearAll();
+    LocalStorageService.setItem(STORAGE_KEYS.USER, freshUser);
+
+    setActiveTab('auth');
   }, []);
 
   return (
@@ -1388,7 +1511,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateUserProfile,
         triggerSyncNow,
         resetAllDataToDefault,
-        loadSampleDemoData
+        loadSampleDemoData,
+        signOut
       }}
     >
       {children}
