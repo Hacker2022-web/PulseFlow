@@ -151,6 +151,9 @@ interface AppContextType {
   resetAllDataToDefault: () => void;
   loadSampleDemoData: () => void;
   signOut: () => Promise<void>;
+  requestSignOut: () => void;
+  isSignOutModalOpen: boolean;
+  setIsSignOutModalOpen: (open: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -160,7 +163,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     LocalStorageService.getItem(STORAGE_KEYS.USER, INITIAL_USER)
   );
 
-  const [activeTab, setActiveTab] = useState<NavigationTab>('auth');
+  const [isSignOutModalOpen, setIsSignOutModalOpen] = useState(false);
+
+  const requestSignOut = useCallback(() => {
+    setIsSignOutModalOpen(true);
+  }, []);
+
+  const [activeTab, setActiveTabState] = useState<NavigationTab>(() => {
+    const savedUser = LocalStorageService.getItem<UserProfile>(STORAGE_KEYS.USER, INITIAL_USER);
+    const savedTab = typeof window !== 'undefined' ? (localStorage.getItem('synctrack_active_tab') as NavigationTab | null) : null;
+    if (savedUser?.email) {
+      if (savedTab && savedTab !== 'auth') return savedTab;
+      return 'dashboard';
+    }
+    return 'auth';
+  });
+
+  const setActiveTab = useCallback((tab: NavigationTab) => {
+    setActiveTabState(tab);
+    if (tab !== 'auth') {
+      try {
+        localStorage.setItem('synctrack_active_tab', tab);
+      } catch {}
+    } else {
+      try {
+        localStorage.removeItem('synctrack_active_tab');
+      } catch {}
+    }
+  }, []);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
   const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
 
@@ -312,13 +342,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!firebaseService.auth) return;
     const unsub = firebaseService.auth.onAuthStateChanged((fbUser) => {
       if (fbUser) {
-        setUser(prev => ({
-          ...prev,
-          uid: fbUser.uid,
-          displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'My Account',
-          email: fbUser.email || prev.email,
-          photoURL: fbUser.photoURL || ''
-        }));
+        setUser(prev => {
+          const updated = {
+            ...prev,
+            uid: fbUser.uid,
+            displayName: fbUser.displayName || fbUser.email?.split('@')[0] || prev.displayName || 'My Account',
+            email: fbUser.email || prev.email,
+            photoURL: fbUser.photoURL || prev.photoURL || ''
+          };
+          LocalStorageService.setItem(STORAGE_KEYS.USER, updated);
+          return updated;
+        });
+        setActiveTabState(prev => (prev === 'auth' ? 'dashboard' : prev));
       }
     });
     return () => unsub();
@@ -1436,8 +1471,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     LocalStorageService.clearAll();
     LocalStorageService.setItem(STORAGE_KEYS.USER, freshUser);
+    try {
+      localStorage.removeItem('synctrack_active_tab');
+    } catch {}
 
-    setActiveTab('auth');
+    setIsSignOutModalOpen(false);
+    setActiveTabState('auth');
   }, []);
 
   return (
@@ -1512,7 +1551,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         triggerSyncNow,
         resetAllDataToDefault,
         loadSampleDemoData,
-        signOut
+        signOut,
+        requestSignOut,
+        isSignOutModalOpen,
+        setIsSignOutModalOpen
       }}
     >
       {children}

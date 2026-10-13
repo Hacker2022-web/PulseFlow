@@ -31,7 +31,7 @@ export interface ComponentProps {
 }
 
 export function Component({ embedded = false, className }: ComponentProps = {}) {
-  const { user, signOut, updateUserProfile, setActiveTab, addNotification } = useApp();
+  const { user, signOut, requestSignOut, updateUserProfile, setActiveTab, addNotification } = useApp();
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [switchAccountMode, setSwitchAccountMode] = useState(false);
@@ -255,14 +255,7 @@ export function Component({ embedded = false, className }: ComponentProps = {}) 
 
                   <button
                     type="button"
-                    onClick={async () => {
-                      setIsLoading(true);
-                      await signOut();
-                      setIsLoading(false);
-                      setAuthSuccess('Signed out successfully.');
-                      setTimeout(() => setAuthSuccess(null), 2500);
-                    }}
-                    disabled={isLoading}
+                    onClick={requestSignOut}
                     className="w-full h-11 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-200 font-medium text-xs transition flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
                   >
                     <LogOut className="w-3.5 h-3.5" />

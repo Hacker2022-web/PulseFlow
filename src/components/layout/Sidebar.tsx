@@ -20,7 +20,7 @@ export const Sidebar: React.FC = () => {
     habits,
     getHabitStreak,
     user,
-    signOut
+    requestSignOut
   } = useApp();
 
   const isAuthenticated = Boolean(user.email);
@@ -210,7 +210,7 @@ export const Sidebar: React.FC = () => {
           {/* Sign Out or Sign In */}
           {isAuthenticated ? (
             <button
-              onClick={signOut}
+              onClick={requestSignOut}
               className="flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all cursor-pointer text-rose-300 hover:text-white hover:bg-rose-500/20 border border-rose-500/25 hover:border-rose-400/40 group mt-1"
               title="Sign out of your account"
             >

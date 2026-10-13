@@ -28,7 +28,7 @@ export const SettingsModal: React.FC = () => {
     loadSampleDemoData,
     triggerSyncNow,
     syncStatus,
-    signOut
+    requestSignOut
   } = useApp();
 
   const [displayName, setDisplayName] = useState(user.displayName);
@@ -153,11 +153,7 @@ export const SettingsModal: React.FC = () => {
                 {user.email && (
                   <button
                     type="button"
-                    onClick={async () => {
-                      if (window.confirm('Are you sure you want to sign out of this account?')) {
-                        await signOut();
-                      }
-                    }}
+                    onClick={requestSignOut}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 font-medium text-xs border border-rose-500/30 transition cursor-pointer"
                   >
                     <LogOut className="w-3.5 h-3.5" />
@@ -391,11 +387,7 @@ export const SettingsModal: React.FC = () => {
           {user.email && (
             <button
               type="button"
-              onClick={async () => {
-                if (window.confirm('Sign out and end your active session?')) {
-                  await signOut();
-                }
-              }}
+              onClick={requestSignOut}
               className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 font-medium text-xs border border-rose-500/30 transition cursor-pointer"
             >
               <LogOut className="w-4 h-4" />

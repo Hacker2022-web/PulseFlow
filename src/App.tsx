@@ -10,6 +10,7 @@ import { ExpensesView } from './components/expenses/ExpensesView';
 import { CollaboratorView } from './components/collaborator/CollaboratorView';
 import { SettingsModal } from './components/modals/SettingsModal';
 import { QuickAddModal } from './components/modals/QuickAddModal';
+import { SignOutModal } from './components/modals/SignOutModal';
 import { DemoOne } from './components/ui/demo';
 
 const AppContent: React.FC = () => {
@@ -18,7 +19,12 @@ const AppContent: React.FC = () => {
 
   // On the auth/login screen, render it full-screen without chrome
   if (activeTab === 'auth') {
-    return <DemoOne />;
+    return (
+      <>
+        <DemoOne />
+        <SignOutModal />
+      </>
+    );
   }
 
   return (
@@ -60,6 +66,9 @@ const AppContent: React.FC = () => {
 
       {/* Global Quick Add Modal */}
       <QuickAddModal isOpen={isQuickAddOpen} onClose={() => setIsQuickAddOpen(false)} />
+
+      {/* Global Sign Out Confirmation Prompt Modal */}
+      <SignOutModal />
     </div>
   );
 };
